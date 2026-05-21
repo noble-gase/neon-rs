@@ -1,0 +1,36 @@
+[package]
+name = "kr-crypto"
+version = "0.1.0"
+edition = { workspace = true }
+description = "crypto toolkit"
+license = "MIT"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+
+aes = { workspace = true }
+aes-gcm = { workspace = true }
+cbc = { workspace = true, features = ["alloc", "block-padding"] }
+ecb = { workspace = true, features = ["alloc", "block-padding"] }
+des = { workspace = true }
+cipher = { workspace = true, features = ["alloc", "block-padding"] }
+block-padding = { workspace = true }
+rsa = { workspace = true, features = ["sha1", "sha2"] }
+pkcs1 = { workspace = true }
+pkcs8 = { workspace = true, features = ["pem"] }
+spki = { workspace = true, features = ["pem"] }
+x509-cert = { workspace = true, features = ["pem"] }
+p12 = { workspace = true }
+
+md-5 = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+digest = { workspace = true }
+
+base64 = { workspace = true }
+const-hex = { workspace = true }
+pem = { workspace = true }
+url = { workspace = true }
+form_urlencoded = { workspace = true }

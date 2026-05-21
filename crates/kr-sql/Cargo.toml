@@ -1,0 +1,16 @@
+[package]
+name = "kr-sql"
+version = "0.1.0"
+edition = { workspace = true }
+description = "sql toolkit"
+license = "MIT"
+
+[dependencies]
+anyhow = { workspace = true }
+sqlx = { workspace = true }
+sea-query = { workspace = true }
+sea-query-binder = { workspace = true, features = [
+    "sqlx-mysql",
+    "sqlx-postgres",
+    "sqlx-sqlite",
+] }
