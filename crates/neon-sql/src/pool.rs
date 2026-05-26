@@ -79,13 +79,13 @@ pub struct Params {
 /// # Examples
 ///
 /// ```ignore
-/// // MySQL: mysql://user:pass@host:3306/db?charset=utf8mb4
+/// // [MySQL] mysql://username:password@host:3306/db?charset=utf8mb4
 /// let pool = open::<MySQL>("dsn".into(), None).await?;
 ///
-/// // PostgreSQL: postgres://user:pass@host:5432/db
+/// // [PgSQL] postgres://username:password@host:5432/db
 /// let pool = open::<PgSQL>("dsn".into(), None).await?;
 ///
-/// // SQLite: sqlite:///path/to.db 或 sqlite::memory:
+/// // [SQLite] sqlite:///path/to.db 或 sqlite::memory:
 /// let pool = open::<SQLite>("dsn".into(), None).await?;
 /// ```
 pub async fn open<F>(dsn: String, opt: Option<Params>) -> anyhow::Result<Pool<F::DB>>

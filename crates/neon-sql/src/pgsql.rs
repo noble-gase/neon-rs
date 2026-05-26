@@ -2,7 +2,7 @@
 
 use std::time::Instant;
 
-use sea_query::{DeleteStatement, Expr, InsertStatement, PostgresQueryBuilder, SelectStatement, UpdateStatement};
+use sea_query::{DeleteStatement, Expr, InsertStatement, PostgresQueryBuilder, SelectStatement, UpdateStatement, inject_parameters};
 use sea_query_sqlx::SqlxBinder;
 use sqlx::{Executor, FromRow, Postgres, postgres::PgRow};
 
@@ -29,11 +29,13 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(&sql, values).fetch_one(db).await;
     let cost = start.elapsed();
 
-    trace_insert_result(sql, cost, ret, |v| v)
+    trace_insert_result(log_sql, cost, ret, |v| v)
 }
 
 /// 批量插入记录；返回 `RETURNING` 映射的行列表（语句需包含 `RETURNING` 子句）
@@ -58,11 +60,13 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(&sql, values).fetch_all(db).await;
     let cost = start.elapsed();
 
-    trace_query_result(sql, cost, ret)
+    trace_query_result(log_sql, cost, ret)
 }
 
 /// 更新记录
@@ -84,11 +88,13 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+
     let start = Instant::now();
     let ret = sqlx::query_with(&sql, values).execute(db).await;
     let cost = start.elapsed();
 
-    trace_execute_result(sql, cost, ret, |v| v.rows_affected())
+    trace_execute_result(log_sql, cost, ret, |v| v.rows_affected())
 }
 
 /// 删除记录
@@ -109,11 +115,13 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+
     let start = Instant::now();
     let ret = sqlx::query_with(&sql, values).execute(db).await;
     let cost = start.elapsed();
 
-    trace_execute_result(sql, cost, ret, |v| v.rows_affected())
+    trace_execute_result(log_sql, cost, ret, |v| v.rows_affected())
 }
 
 /// 统计记录数
@@ -139,11 +147,13 @@ where
 
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+
     let start = Instant::now();
     let ret: Result<i64, sqlx::Error> = sqlx::query_scalar_with(&sql, values).fetch_one(db).await;
     let cost = start.elapsed();
 
-    trace_query_result(sql, cost, ret)
+    trace_query_result(log_sql, cost, ret)
 }
 
 /// 查询单条记录
@@ -167,11 +177,13 @@ where
     stmt.limit(1);
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(&sql, values).fetch_optional(db).await;
     let cost = start.elapsed();
 
-    trace_query_result(sql, cost, ret)
+    trace_query_result(log_sql, cost, ret)
 }
 
 /// 查询多条记录
@@ -194,11 +206,13 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(&sql, values).fetch_all(db).await;
     let cost = start.elapsed();
 
-    trace_query_result(sql, cost, ret)
+    trace_query_result(log_sql, cost, ret)
 }
 
 /// 分页查询
@@ -228,11 +242,13 @@ where
 
     let (count_sql, count_values) = count.build_sqlx(PostgresQueryBuilder);
 
+    let log_count_sql = inject_parameters(&count_sql, &count_values.0.0, &PostgresQueryBuilder);
+
     let count_start = Instant::now();
     let ret: Result<i64, sqlx::Error> = sqlx::query_scalar_with(&count_sql, count_values).fetch_one(db).await;
     let count_cost = count_start.elapsed();
 
-    let total = trace_query_result(count_sql, count_cost, ret)?;
+    let total = trace_query_result(log_count_sql, count_cost, ret)?;
     if total == 0 {
         return Ok((Vec::new(), total));
     }
@@ -248,10 +264,12 @@ where
 
     let (query_sql, query_values) = stmt.build_sqlx(PostgresQueryBuilder);
 
+    let log_query_sql = inject_parameters(&query_sql, &query_values.0.0, &PostgresQueryBuilder);
+
     let query_start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(&query_sql, query_values).fetch_all(db).await;
     let query_cost = query_start.elapsed();
 
-    let list = trace_query_result(query_sql, query_cost, ret)?;
+    let list = trace_query_result(log_query_sql, query_cost, ret)?;
     Ok((list, total))
 }
