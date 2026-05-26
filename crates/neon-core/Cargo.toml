@@ -1,0 +1,18 @@
+[package]
+name = "ners-core"
+version = "0.1.0"
+edition = { workspace = true }
+description = "core toolkit"
+license = "MIT"
+
+[dependencies]
+anyhow = { workspace = true, optional = true }
+jiff = { workspace = true, optional = true }
+time = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true }
+const-hex = { workspace = true, optional = true }
+
+[features]
+default = []
+helper = ["dep:getrandom", "dep:const-hex"]
+zoned = ["dep:jiff", "dep:time", "dep:anyhow"]

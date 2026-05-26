@@ -1,0 +1,58 @@
+[package]
+name = "ners-crypto"
+version = "0.1.0"
+edition = { workspace = true }
+description = "crypto toolkit"
+license = "MIT"
+
+[dependencies]
+anyhow = { workspace = true }
+digest = { workspace = true, optional = true, features = ["block-api"] }
+md-5 = { workspace = true, optional = true }
+sha1 = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+hmac = { workspace = true, optional = true }
+const-hex = { workspace = true, optional = true }
+aes = { workspace = true, optional = true }
+aes-gcm = { workspace = true, optional = true }
+cbc = { workspace = true, optional = true, features = ["alloc", "block-padding"] }
+des = { workspace = true, optional = true }
+cipher = { workspace = true, optional = true, features = ["std", "alloc", "block-padding"] }
+block-padding = { workspace = true, optional = true }
+rsa = { workspace = true, optional = true, features = ["sha1", "sha2"] }
+pkcs1 = { workspace = true, optional = true }
+pkcs8 = { workspace = true, optional = true, features = ["pem"] }
+spki = { workspace = true, optional = true, features = ["pem"] }
+x509-cert = { workspace = true, optional = true, features = ["pem"] }
+p12 = { workspace = true, optional = true }
+pem = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+base64 = { workspace = true, optional = true }
+
+[features]
+default = []
+hash = ["dep:digest", "dep:md-5", "dep:sha1", "dep:sha2", "dep:hmac", "dep:const-hex"]
+aes = [
+    "dep:aes",
+    "dep:aes-gcm",
+    "dep:cbc",
+    "dep:cipher",
+    "dep:block-padding",
+    "dep:rand",
+    "dep:base64",
+]
+des = ["dep:des", "dep:cipher"]
+rsa = [
+    "dep:rsa",
+    "dep:pkcs1",
+    "dep:pkcs8",
+    "dep:spki",
+    "dep:x509-cert",
+    "dep:p12",
+    "dep:pem",
+    "dep:md-5",
+    "dep:sha1",
+    "dep:sha2",
+    "dep:digest",
+    "dep:rand",
+]

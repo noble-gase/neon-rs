@@ -1,0 +1,25 @@
+[package]
+name = "ners-redis"
+version = "0.1.0"
+edition = { workspace = true }
+description = "redis toolkit"
+license = "MIT"
+
+[dependencies]
+tokio = { workspace = true, features = ["rt", "time"] }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+bb8 = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+r2d2 = { workspace = true, optional = true }
+redis = { workspace = true, features = ["tokio-comp", "script"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros"] }
+
+[features]
+default = []
+cluster = ["redis/cluster", "redis/cluster-async"]
+sync-lock = ["dep:r2d2", "redis/r2d2"]

@@ -1,0 +1,36 @@
+[package]
+name = "ners-sql"
+version = "0.1.0"
+edition = { workspace = true }
+description = "sql toolkit"
+license = "MIT"
+
+[dependencies]
+anyhow = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio"] }
+sea-query = { workspace = true, optional = true, features = ["thread-safe"] }
+sea-query-sqlx = { workspace = true, optional = true }
+
+[features]
+default = []
+mysql = [
+    "dep:sea-query",
+    "dep:sea-query-sqlx",
+    "sea-query-sqlx/sqlx-mysql",
+    "sea-query/backend-mysql",
+    "sqlx/mysql",
+]
+postgres = [
+    "dep:sea-query",
+    "dep:sea-query-sqlx",
+    "sea-query-sqlx/sqlx-postgres",
+    "sea-query/backend-postgres",
+    "sqlx/postgres",
+]
+sqlite = [
+    "dep:sea-query",
+    "dep:sea-query-sqlx",
+    "sea-query-sqlx/sqlx-sqlite",
+    "sea-query/backend-sqlite",
+    "sqlx/sqlite",
+]
