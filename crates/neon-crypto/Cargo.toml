@@ -1,6 +1,6 @@
 [package]
 name = "ners-crypto"
-version = "0.1.0"
+version = "0.0.1"
 edition = { workspace = true }
 description = "crypto toolkit"
 license = "MIT"
@@ -15,9 +15,16 @@ hmac = { workspace = true, optional = true }
 const-hex = { workspace = true, optional = true }
 aes = { workspace = true, optional = true }
 aes-gcm = { workspace = true, optional = true }
-cbc = { workspace = true, optional = true, features = ["alloc", "block-padding"] }
+cbc = { workspace = true, optional = true, features = [
+    "alloc",
+    "block-padding",
+] }
 des = { workspace = true, optional = true }
-cipher = { workspace = true, optional = true, features = ["std", "alloc", "block-padding"] }
+cipher = { workspace = true, optional = true, features = [
+    "std",
+    "alloc",
+    "block-padding",
+] }
 block-padding = { workspace = true, optional = true }
 rsa = { workspace = true, optional = true, features = ["sha1", "sha2"] }
 pkcs1 = { workspace = true, optional = true }
@@ -31,7 +38,14 @@ base64 = { workspace = true, optional = true }
 
 [features]
 default = []
-hash = ["dep:digest", "dep:md-5", "dep:sha1", "dep:sha2", "dep:hmac", "dep:const-hex"]
+hash = [
+    "dep:digest",
+    "dep:md-5",
+    "dep:sha1",
+    "dep:sha2",
+    "dep:hmac",
+    "dep:const-hex",
+]
 aes = [
     "dep:aes",
     "dep:aes-gcm",
