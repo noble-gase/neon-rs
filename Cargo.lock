@@ -1060,18 +1060,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ners"
-version = "0.0.1"
-dependencies = [
- "ners-core",
- "ners-crypto",
- "ners-macros",
- "ners-redis",
- "ners-sql",
-]
-
-[[package]]
-name = "ners-core"
+name = "neon-core"
 version = "0.0.1"
 dependencies = [
  "anyhow",
@@ -1082,7 +1071,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ners-crypto"
+name = "neon-crypto"
 version = "0.0.1"
 dependencies = [
  "aes",
@@ -1110,7 +1099,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ners-macros"
+name = "neon-macro"
 version = "0.0.1"
 dependencies = [
  "proc-macro2",
@@ -1119,7 +1108,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ners-redis"
+name = "neon-redis"
 version = "0.0.1"
 dependencies = [
  "anyhow",
@@ -1134,7 +1123,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "ners-sql"
+name = "neon-rs"
+version = "0.0.1"
+dependencies = [
+ "neon-core",
+ "neon-crypto",
+ "neon-macro",
+ "neon-redis",
+ "neon-sql",
+]
+
+[[package]]
+name = "neon-sql"
 version = "0.0.1"
 dependencies = [
  "anyhow",

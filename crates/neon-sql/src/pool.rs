@@ -80,13 +80,13 @@ pub struct Params {
 ///
 /// ```ignore
 /// // MySQL: mysql://user:pass@host:3306/db?charset=utf8mb4
-/// let pool = ners_sql::pool::open::<ners_sql::pool::MySQL>("dsn".into(), None).await?;
+/// let pool = open::<MySQL>("dsn".into(), None).await?;
 ///
 /// // PostgreSQL: postgres://user:pass@host:5432/db
-/// let pool = ners_sql::pool::open::<ners_sql::pool::PgSQL>("dsn".into(), None).await?;
+/// let pool = open::<PgSQL>("dsn".into(), None).await?;
 ///
 /// // SQLite: sqlite:///path/to.db 或 sqlite::memory:
-/// let pool = ners_sql::pool::open::<ners_sql::pool::SQLite>("dsn".into(), None).await?;
+/// let pool = open::<SQLite>("dsn".into(), None).await?;
 /// ```
 pub async fn open<F>(dsn: String, opt: Option<Params>) -> anyhow::Result<Pool<F::DB>>
 where

@@ -1,6 +1,6 @@
-//! `ners`：Rust 开发工具集
+//! `neon`：Rust 开发工具集
 
-pub use ners_core as core;
+pub use neon_core as core;
 
 #[cfg(any(
     feature = "crypto",
@@ -9,13 +9,13 @@ pub use ners_core as core;
     feature = "crypto-des",
     feature = "crypto-rsa"
 ))]
-pub use ners_crypto as crypto;
+pub use neon_crypto as crypto;
 
 #[cfg(feature = "macros")]
-pub use ners_macros as macros;
+pub use neon_macro as macros;
 
 #[cfg(any(feature = "redis", feature = "redis-cluster", feature = "redis-sync-lock"))]
-pub use ners_redis as redis;
+pub use neon_redis as redis;
 
 #[cfg(any(feature = "sql", feature = "sql-mysql", feature = "sql-postgres", feature = "sql-sqlite"))]
-pub use ners_sql as sql;
+pub use neon_sql as sql;

@@ -1,5 +1,5 @@
 [package]
-name = "ners-redis"
+name = "neon-redis"
 version = "0.0.1"
 edition = { workspace = true }
 description = "redis toolkit"

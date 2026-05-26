@@ -1,6 +1,6 @@
-# ners
+# neon-rs
 
-[<img alt="crates.io" src="https://img.shields.io/crates/v/ners.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/ners)
+[<img alt="crates.io" src="https://img.shields.io/crates/v/neon.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/neon)
 [<img alt="MIT" src="http://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge" height="20">](http://opensource.org/licenses/MIT)
 
 [氖-Neon] Rust 开发工具集
@@ -9,7 +9,7 @@
 
 ```shell
 # 按需启用 feature
-cargo add ners --features "crypto,macros,redis,sql-mysql"
+cargo add neon-rs --features "crypto,macros,redis,sql-mysql"
 ```
 
 ## Crates
@@ -50,7 +50,7 @@ cargo add ners --features "crypto,macros,redis,sql-mysql"
 
 [`redlock`](crates/neon-redis/src/redlock.rs) 为单 key `SET NX` + TTL 互斥锁，**非** Antirez 多 master quorum Redlock。未获锁时 `acquire` 返回 `None`
 
-## ners-macros
+## neon-macros
 
 #### 派生宏：Model
 

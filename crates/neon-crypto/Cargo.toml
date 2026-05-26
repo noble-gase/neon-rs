@@ -1,5 +1,5 @@
 [package]
-name = "ners-crypto"
+name = "neon-crypto"
 version = "0.0.1"
 edition = { workspace = true }
 description = "crypto toolkit"

@@ -88,25 +88,26 @@ async fn release_async<C: AsyncCommands>(conn: &mut C, key: &str, token: &str) -
     Ok(())
 }
 
-/// 基于 Redis 的同步分布式锁（`sync-lock` feature，Drop 时自动释放）。
-///
-/// 支持单节点与 Redis Cluster（需同时启用 `cluster` feature）。
+/// 基于Redis的分布式锁（离开作用域自动释放）
 ///
 /// # Examples
 ///
-/// ```no_run
-/// use std::time::Duration;
-///
-/// use ners_redis::{SyncPool, redlock::RedLock};
-///
-/// # fn example(pool: r2d2::Pool<redis::Client>) -> anyhow::Result<()> {
-/// let lock = RedLock::new(SyncPool::Single(pool), "key", Duration::from_secs(10)).acquire()?;
+/// ```ignore
+/// // 获取锁
+/// let lock = RedLock::new(pool, "key", Duration::from_secs(10)).acquire()?;
 /// if lock.is_none() {
-///     return Err(anyhow::anyhow!("operation is too frequent, please try again later"));
+///     return Err("operation is too frequent, please try again later")
 /// }
+/// // 手动释放
 /// lock.unwrap().release()?;
-/// # Ok(())
-/// # }
+///
+/// // 尝试获取锁（重试3次，间隔100ms）
+/// let lock = RedLock::new(pool, "key", Duration::from_secs(10)).try_acquire(3, Duration::from_millis(100))?;
+/// if lock.is_none() {
+///     return Err("operation is too frequent, please try again later")
+/// }
+/// // 手动释放
+/// lock.unwrap().release()?;
 /// ```
 #[cfg(feature = "sync-lock")]
 pub struct RedLock {
@@ -209,27 +210,30 @@ impl Drop for RedLock {
     }
 }
 
-/// 基于 Redis 的异步分布式锁（Drop 时在后台 task 中释放）。
-///
-/// 支持单节点与 Redis Cluster（需启用 `cluster` feature）。
+/// 基于Redis的异步分布式锁（离开作用域自动释放）
 ///
 /// # Examples
 ///
-/// ```no_run
-/// use std::time::Duration;
-///
-/// use ners_redis::{AsyncPool, redlock::AsyncRedLock};
-///
-/// # async fn example(pool: ners_redis::pool::SinglePool) -> anyhow::Result<()> {
-/// let lock = AsyncRedLock::new(AsyncPool::Single(pool), "key", Duration::from_secs(10))
+/// ```ignore
+/// // 获取锁
+/// let lock = AsyncRedLock::new(pool, "key", Duration::from_secs(10))
 ///     .acquire()
 ///     .await?;
 /// if lock.is_none() {
-///     return Err(anyhow::anyhow!("operation is too frequent, please try again later"));
+///     return Err("operation is too frequent, please try again later")
 /// }
+/// // 手动释放
 /// lock.unwrap().release().await?;
-/// # Ok(())
-/// # }
+///
+/// // 尝试获取锁（重试3次，间隔100ms）
+/// let lock = AsyncRedLock::new(pool, "key", Duration::from_secs(10))
+///     .try_acquire(3, Duration::from_millis(100))
+///     .await?;
+/// if lock.is_none() {
+///     return Err("operation is too frequent, please try again later")
+/// }
+/// // 手动释放
+/// lock.unwrap().release().await?;
 /// ```
 pub struct AsyncRedLock {
     pool: AsyncPool,
