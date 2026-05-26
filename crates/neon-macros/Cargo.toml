@@ -4,6 +4,7 @@ version = "0.0.1"
 edition = { workspace = true }
 description = "macros toolkit"
 license = "MIT"
+repository = { workspace = true }
 
 [lib]
 proc-macro = true

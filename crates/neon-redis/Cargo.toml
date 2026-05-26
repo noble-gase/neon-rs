@@ -4,6 +4,7 @@ version = "0.0.1"
 edition = { workspace = true }
 description = "redis toolkit"
 license = "MIT"
+repository = { workspace = true }
 
 [dependencies]
 tokio = { workspace = true, features = ["rt", "time"] }

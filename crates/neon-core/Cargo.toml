@@ -2,8 +2,9 @@
 name = "ners-core"
 version = "0.0.1"
 edition = { workspace = true }
-description = "core toolkit"
+description = "base toolkit"
 license = "MIT"
+repository = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true, optional = true }
