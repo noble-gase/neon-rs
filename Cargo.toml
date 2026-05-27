@@ -9,8 +9,8 @@ license = "MIT"
 repository = { workspace = true }
 
 [workspace]
+resolver = "3"
 members = ["crates/*"]
-resolver = "2"
 
 [workspace.package]
 edition = "2024"
