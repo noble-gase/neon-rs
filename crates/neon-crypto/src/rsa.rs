@@ -274,7 +274,7 @@ impl PublicKey {
                 .map_err(|e| anyhow!("PKIX: {e}")),
             CERTIFICATE => {
                 let cert = Certificate::from_der(pem.contents()).map_err(|e| anyhow!("X.509: {e}"))?;
-                public_key_from_spki(cert.tbs_certificate.subject_public_key_info)
+                public_key_from_spki(cert.tbs_certificate().subject_public_key_info().clone())
             }
             other => Err(anyhow!("unsupported PEM type: {other}")),
         }

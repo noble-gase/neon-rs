@@ -1,11 +1,13 @@
 //! AES 对称加密（CBC / ECB / GCM）。
 
-use aes::cipher::{BlockDecrypt, BlockDecryptMut, BlockEncrypt, BlockEncryptMut, KeyInit, KeyIvInit, generic_array::GenericArray};
 use aes::{Aes128, Aes192, Aes256};
-use aes_gcm::aead::generic_array::typenum::{U12, U13, U14, U15, U16};
-use aes_gcm::aead::{Aead, Payload};
+use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{AesGcm, Nonce};
 use anyhow::anyhow;
+use cipher::{
+    Array, BlockCipherDecrypt, BlockCipherEncrypt, BlockModeDecrypt, BlockModeEncrypt, BlockSizeUser, KeyIvInit, consts::U16,
+};
+use cipher::typenum::{U12, U13, U14, U15, U16 as TagU16};
 
 use crate::{CipherText, pkcs7_padding, pkcs7_unpadding};
 
@@ -66,12 +68,12 @@ pub fn aes_encrypt_cbc(
 
 fn encrypt_cbc_blocks<E>(enc: Result<E, cipher::InvalidLength>, buf: &mut [u8]) -> anyhow::Result<Vec<u8>>
 where
-    E: BlockEncryptMut + cipher::BlockSizeUser<BlockSize = cipher::consts::U16>,
+    E: BlockModeEncrypt + BlockSizeUser<BlockSize = U16>,
 {
     let mut enc = enc.map_err(anyhow::Error::from)?;
     for block in buf.chunks_mut(BLOCK_SIZE) {
-        let arr = GenericArray::from_mut_slice(block);
-        enc.encrypt_block_mut(arr);
+        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
+        enc.encrypt_block(block);
     }
     Ok(buf.to_vec())
 }
@@ -102,12 +104,12 @@ pub fn aes_decrypt_cbc(key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>, data: impl A
 
 fn decrypt_cbc_blocks<D>(dec: Result<D, cipher::InvalidLength>, buf: &mut [u8]) -> anyhow::Result<()>
 where
-    D: BlockDecryptMut + cipher::BlockSizeUser<BlockSize = cipher::consts::U16>,
+    D: BlockModeDecrypt + BlockSizeUser<BlockSize = U16>,
 {
     let mut dec = dec.map_err(anyhow::Error::from)?;
     for block in buf.chunks_mut(BLOCK_SIZE) {
-        let arr = GenericArray::from_mut_slice(block);
-        dec.decrypt_block_mut(arr);
+        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
+        dec.decrypt_block(block);
     }
     Ok(())
 }
@@ -126,11 +128,11 @@ pub fn aes_encrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>, padding_si
     }
 
     for block in buf.chunks_mut(BLOCK_SIZE) {
-        let arr = GenericArray::from_mut_slice(block);
+        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
         match &cipher {
-            AesKey::K128(c) => c.encrypt_block(arr),
-            AesKey::K192(c) => c.encrypt_block(arr),
-            AesKey::K256(c) => c.encrypt_block(arr),
+            AesKey::K128(c) => c.encrypt_block(block),
+            AesKey::K192(c) => c.encrypt_block(block),
+            AesKey::K256(c) => c.encrypt_block(block),
         }
     }
     Ok(CipherText { bytes: buf, tag_size: 0 })
@@ -147,11 +149,11 @@ pub fn aes_decrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow:
 
     let mut out = data.to_vec();
     for block in out.chunks_mut(BLOCK_SIZE) {
-        let arr = GenericArray::from_mut_slice(block);
+        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
         match &cipher {
-            AesKey::K128(c) => c.decrypt_block(arr),
-            AesKey::K192(c) => c.decrypt_block(arr),
-            AesKey::K256(c) => c.decrypt_block(arr),
+            AesKey::K128(c) => c.decrypt_block(block),
+            AesKey::K192(c) => c.decrypt_block(block),
+            AesKey::K256(c) => c.decrypt_block(block),
         }
     }
     pkcs7_unpadding(&mut out)?;
@@ -241,12 +243,12 @@ fn gcm_op(key: &[u8], nonce: &[u8], data: &[u8], aad: &[u8], nonce_size: usize, 
     macro_rules! gcm_run {
         ($aes:ty, $ns:ty, $ts:ty) => {{
             let cipher = AesGcm::<$aes, $ns, $ts>::new_from_slice(key).map_err(anyhow::Error::from)?;
-            let n = Nonce::<$ns>::from_slice(nonce);
+            let n = Nonce::<$ns>::try_from(nonce).map_err(|_| anyhow!("incorrect nonce length given to GCM"))?;
             let payload = Payload { msg: data, aad };
             if seal {
-                cipher.encrypt(n, payload).map_err(|e| anyhow!(e.to_string()))
+                cipher.encrypt(&n, payload).map_err(|e| anyhow!(e.to_string()))
             } else {
-                cipher.decrypt(n, payload).map_err(|e| anyhow!(e.to_string()))
+                cipher.decrypt(&n, payload).map_err(|e| anyhow!(e.to_string()))
             }
         }};
     }
@@ -258,7 +260,7 @@ fn gcm_op(key: &[u8], nonce: &[u8], data: &[u8], aad: &[u8], nonce_size: usize, 
                 13 => gcm_run!($aes, $ns, U13),
                 14 => gcm_run!($aes, $ns, U14),
                 15 => gcm_run!($aes, $ns, U15),
-                16 => gcm_run!($aes, $ns, U16),
+                16 => gcm_run!($aes, $ns, TagU16),
                 _ => Err(anyhow!("unsupported tag size")),
             }
         };
@@ -271,7 +273,7 @@ fn gcm_op(key: &[u8], nonce: &[u8], data: &[u8], aad: &[u8], nonce_size: usize, 
                 13 => gcm_for_tag!($aes, U13),
                 14 => gcm_for_tag!($aes, U14),
                 15 => gcm_for_tag!($aes, U15),
-                16 => gcm_for_tag!($aes, U16),
+                16 => gcm_for_tag!($aes, TagU16),
                 _ => Err(anyhow!("unsupported nonce size")),
             }
         };

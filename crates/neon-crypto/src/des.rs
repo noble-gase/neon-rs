@@ -1,7 +1,7 @@
 //! DES 对称加密（ECB + PKCS#7）。
 
 use anyhow::anyhow;
-use cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
+use cipher::{Array, BlockCipherDecrypt, BlockCipherEncrypt, KeyInit, consts::U8};
 use des::Des;
 
 use crate::{CipherText, pkcs7_padding, pkcs7_unpadding};
@@ -21,7 +21,8 @@ pub fn des_encrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow:
     }
 
     for block in buf.chunks_mut(BLOCK) {
-        cipher.encrypt_block(GenericArray::from_mut_slice(block));
+        let block = Array::<u8, U8>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
+        cipher.encrypt_block(block);
     }
     Ok(CipherText { bytes: buf, tag_size: 0 })
 }
@@ -37,7 +38,8 @@ pub fn des_decrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow:
 
     let mut out = data.to_vec();
     for block in out.chunks_mut(BLOCK) {
-        cipher.decrypt_block(GenericArray::from_mut_slice(block));
+        let block = Array::<u8, U8>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
+        cipher.decrypt_block(block);
     }
     pkcs7_unpadding(&mut out)?;
     Ok(out)

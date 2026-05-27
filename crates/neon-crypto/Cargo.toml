@@ -15,14 +15,13 @@ sha2 = { workspace = true, optional = true }
 hmac = { workspace = true, optional = true }
 const-hex = { workspace = true, optional = true }
 aes = { workspace = true, optional = true }
-aes-gcm = { workspace = true, optional = true }
+aes-gcm = { workspace = true, optional = true, features = ["alloc"] }
 cbc = { workspace = true, optional = true, features = [
     "alloc",
     "block-padding",
 ] }
 des = { workspace = true, optional = true }
 cipher = { workspace = true, optional = true, features = [
-    "std",
     "alloc",
     "block-padding",
 ] }
@@ -56,7 +55,7 @@ aes = [
     "dep:rand",
     "dep:base64",
 ]
-des = ["dep:des", "dep:cipher"]
+des = ["dep:des", "dep:cipher", "dep:base64"]
 rsa = [
     "dep:rsa",
     "dep:pkcs1",

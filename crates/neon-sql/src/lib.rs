@@ -1,6 +1,6 @@
 //! SQL 工具集：连接池与基于 sea-query 的 CRUD helper（按后端 feature 启用）。
 
-pub mod pool;
+pub mod client;
 
 #[cfg(feature = "mysql")]
 pub mod mysql;
@@ -48,7 +48,7 @@ static SQL_LOGGER: OnceLock<Logger> = OnceLock::new();
 /// # Examples
 ///
 /// ```ignore
-/// sql::set_sql_logger(|sql, cost, err| {
+/// set_sql_logger(|sql, cost, err| {
 ///     match err {
 ///         Some(e) => {
 ///             tracing::error!(sql = sql, cost_ms = cost.as_millis(), err = %e, "sql error");

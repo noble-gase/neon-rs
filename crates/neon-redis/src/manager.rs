@@ -22,7 +22,7 @@ impl bb8::ManageConnection for RedisConnManager {
         let pong: String = redis::cmd("PING").query_async(conn).await?;
         match pong.as_str() {
             "PONG" => Ok(()),
-            _ => Err((redis::ErrorKind::ResponseError, "ping request").into()),
+            _ => Err(redis::RedisError::from((redis::ErrorKind::UnexpectedReturnType, "ping request"))),
         }
     }
 
@@ -62,7 +62,7 @@ impl bb8::ManageConnection for RedisClusterManager {
         let pong: String = redis::cmd("PING").query_async(conn).await?;
         match pong.as_str() {
             "PONG" => Ok(()),
-            _ => Err((redis::ErrorKind::ResponseError, "ping request").into()),
+            _ => Err(redis::RedisError::from((redis::ErrorKind::UnexpectedReturnType, "ping request"))),
         }
     }
 
