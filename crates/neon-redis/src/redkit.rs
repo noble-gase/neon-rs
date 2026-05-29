@@ -326,7 +326,10 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use serde_json::json;
 
-    use crate::client::{self, Cluster, Single};
+    use crate::{
+        factory::{Cluster, Single},
+        open,
+    };
 
     use super::*;
 
@@ -339,7 +342,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_get_or_set() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let ret = get_or_set(
             AsyncPool::Single(pool.clone()),
@@ -366,7 +369,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hget_or_set() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let ret = hget_or_set(
             AsyncPool::Single(pool.clone()),
@@ -394,7 +397,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_mget_map() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -418,7 +421,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_mget_str_map() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -442,7 +445,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hgetall() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -467,7 +470,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hmget_map() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -494,7 +497,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hmget_str_map() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -522,7 +525,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_get_or_set_cluster() {
-        let pool = client::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let ret = get_or_set(
             AsyncPool::Cluster(pool.clone()),
@@ -546,7 +549,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_hget_or_set_cluster() {
-        let pool = client::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let ret = hget_or_set(
             AsyncPool::Cluster(pool.clone()),
@@ -571,7 +574,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_mget_map_cluster() {
-        let pool = client::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -604,7 +607,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_hgetall_cluster() {
-        let pool = client::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         let _: RedisResult<()> = pool
             .get()

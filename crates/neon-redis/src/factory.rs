@@ -1,7 +1,5 @@
 //! Redis 连接池：单节点与 Cluster（`cluster` feature）的 bb8 / r2d2 封装。
 
-use std::time::Duration;
-
 use bb8::ManageConnection;
 
 use crate::manager;
@@ -54,52 +52,4 @@ impl Factory for Cluster {
 
         Ok(manager::RedisClusterManager::new(client))
     }
-}
-
-/// 连接池参数；未设置的项使用库内默认值
-#[derive(Default, Debug)]
-pub struct Params {
-    /// 最大连接数，默认 100。
-    pub max_size: Option<u32>,
-    /// 最小空闲连接数。
-    pub min_idle: Option<u32>,
-    /// 获取连接超时，默认 10 秒。
-    pub conn_timeout: Option<Duration>,
-    /// 空闲连接回收时间。
-    pub idle_timeout: Option<Duration>,
-    /// 连接最大存活时间。
-    pub max_lifetime: Option<Duration>,
-}
-
-/// 创建 Redis 连接池
-///
-/// 建池前会对首个 DSN 执行 `PING` 校验连通性
-///
-/// # Examples
-///
-/// ```
-/// // 单节点
-/// let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await?;
-///
-/// // 集群（需启用 `cluster` feature）
-/// let cluster = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await?;
-/// ```
-pub async fn open<F>(dsn: Vec<impl AsRef<str>>, opt: Option<Params>) -> anyhow::Result<bb8::Pool<F::Manager>>
-where
-    F: Factory,
-{
-    let manager = F::build(dsn)?;
-
-    let params = opt.unwrap_or_default();
-
-    let pool = bb8::Pool::builder()
-        .max_size(params.max_size.unwrap_or(100))
-        .min_idle(params.min_idle)
-        .connection_timeout(params.conn_timeout.unwrap_or(Duration::from_secs(10)))
-        .idle_timeout(params.idle_timeout)
-        .max_lifetime(params.max_lifetime)
-        .build(manager)
-        .await?;
-
-    Ok(pool)
 }

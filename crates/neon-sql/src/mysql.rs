@@ -6,7 +6,10 @@ use sea_query::{DeleteStatement, Expr, InsertStatement, MysqlQueryBuilder, Selec
 use sea_query_sqlx::SqlxBinder;
 use sqlx::{AssertSqlSafe, Executor, FromRow, MySql, mysql::MySqlRow};
 
-use crate::{InsertOutcome, trace_execute_result, trace_insert_result, trace_query_result};
+use crate::{
+    InsertOutcome,
+    factory::{trace_execute_result, trace_insert_result, trace_query_result},
+};
 
 /// 插入记录；成功时返回 `last_insert_id`
 ///

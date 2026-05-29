@@ -1,0 +1,20 @@
+[package]
+name = "neon-helper"
+version = "0.0.1"
+edition = { workspace = true }
+description = "helper toolkit"
+license = "MIT"
+repository = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+jiff = { workspace = true }
+time = { workspace = true }
+getrandom = { workspace = true }
+const-hex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+reqwest = { workspace = true, features = ["blocking", "rustls"] }
+libflate = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -375,7 +375,10 @@ impl Drop for AsyncRedLock {
 mod tests {
     use std::time::Duration;
 
-    use crate::client::{self, Cluster, Single};
+    use crate::{
+        factory::{Cluster, Single},
+        open,
+    };
 
     use super::*;
 
@@ -405,7 +408,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_async_red_lock() {
-        let pool = client::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         {
             let lock = AsyncRedLock::new(AsyncPool::Single(pool), "test_async_red_lock", Duration::from_secs(10))
@@ -422,7 +425,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_async_red_lock_cluster() {
-        let pool = client::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
 
         {
             let lock = AsyncRedLock::new(AsyncPool::Cluster(pool), "test_async_red_lock_cluster", Duration::from_secs(10))

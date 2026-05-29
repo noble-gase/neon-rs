@@ -6,7 +6,10 @@ use sea_query::{DeleteStatement, Expr, InsertStatement, PostgresQueryBuilder, Se
 use sea_query_sqlx::SqlxBinder;
 use sqlx::{AssertSqlSafe, Executor, FromRow, Postgres, postgres::PgRow};
 
-use crate::{InsertOutcome, trace_execute_result, trace_insert_result, trace_query_result};
+use crate::{
+    InsertOutcome,
+    factory::{trace_execute_result, trace_insert_result, trace_query_result},
+};
 
 /// 插入记录；成功时返回 `RETURNING` 映射的行（语句需包含 `RETURNING` 子句）
 ///
