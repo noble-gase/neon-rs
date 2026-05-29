@@ -1,6 +1,6 @@
 # neon-rs
 
-[<img alt="crates.io" src="https://img.shields.io/crates/v/neon.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/neon-rs)
+[<img alt="crates.io" src="https://img.shields.io/crates/v/neon-rs.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/neon-rs)
 [<img alt="MIT" src="http://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge" height="20">](http://opensource.org/licenses/MIT)
 
 [氖-Neon] Rust 开发工具集
