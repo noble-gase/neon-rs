@@ -44,11 +44,11 @@ cargo add neon-rs --features "crypto,macros,redis,sql-mysql"
 
 ### PostgreSQL 插入
 
-`pgsql::insert` / `batch_insert` 通过 `query_as` 读取结果，**INSERT 语句须包含 `RETURNING`**（例如 `.returning_all()` 或 `.returning_col(...)`）。
+`pgsql::insert` / `batch_insert` 通过 `query_as` 读取结果，**INSERT 语句须包含 `RETURNING`**（例如 `.returning_all()` 或 `.returning_col(...)`）
 
 ### Redis 分布式锁
 
-[`redlock`](crates/neon-redis/src/redlock.rs) 为单 key `SET NX` + TTL 互斥锁，**非** Antirez 多 master quorum Redlock。未获锁时 `acquire` 返回 `None`
+[`redlock`](crates/neon-redis/src/redlock.rs) 为单 key `SET NX` + TTL 互斥锁，**非** Antirez 多 master quorum Redlock；未获锁时 `acquire` 返回 `None`
 
 ## neon-macros
 
@@ -71,6 +71,6 @@ pub struct User {
 }
 ```
 
-生成带 `sqlx::FromRow` 的子 struct（字段子集），便于查询映射。
+生成带 `sqlx::FromRow` 的子 struct（字段子集），便于查询映射
 
 **Enjoy 😊**

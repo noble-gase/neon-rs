@@ -5,7 +5,7 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::AsyncPool;
 
-/// Hash 字段写入脚本：若 key 无 TTL 则设置过期时间（用于 `hget_or_set`）。
+/// Hash 字段写入脚本：若 key 无 TTL 则设置过期时间（用于 `hget_or_set`）
 const HSET: &str = r#"
 redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
 if redis.call('TTL', KEYS[1]) == -1 then

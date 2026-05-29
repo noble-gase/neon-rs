@@ -1,17 +1,17 @@
-//! 由扁平列表按父 ID 构建树。
+//! 由扁平列表按父 ID 构建树
 
 use std::collections::HashMap;
 use std::hash::Hash;
 
 use serde::{Deserialize, Serialize};
 
-/// 扁平记录需提供 ID 与 PID。
+/// 扁平记录需提供 ID 与 PID
 pub trait Node<E> {
     fn id(&self) -> E;
     fn pid(&self) -> E;
 }
 
-/// 树节点；`id` / `pid` 通过 [`Node`] 从 `data` 读取。
+/// 树节点；`id` / `pid` 通过 [`Node`] 从 `data` 读取
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TreeNode<T> {
     pub data: T,
@@ -35,7 +35,7 @@ where
     out
 }
 
-/// 构建树：`root_id` 为顶层节点所挂的父 ID（即这些节点的 `pid()` 等于 `root_id`）。
+/// 构建树：`root_id` 为顶层节点所挂的父 ID（即这些节点的 `pid()` 等于 `root_id`）
 pub fn new_tree<T, E>(data: impl IntoIterator<Item = T>, root_id: E) -> Vec<TreeNode<T>>
 where
     T: Node<E>,
@@ -106,13 +106,7 @@ mod tests {
 
     #[test]
     fn multiple_top_level_nodes() {
-        let tree = new_tree(
-            vec![
-                Item { id: 1, pid: 0, name: "a" },
-                Item { id: 2, pid: 0, name: "b" },
-            ],
-            0,
-        );
+        let tree = new_tree(vec![Item { id: 1, pid: 0, name: "a" }, Item { id: 2, pid: 0, name: "b" }], 0);
         dump_tree("multiple_top_level_nodes", &tree);
         assert_eq!(tree.len(), 2);
         assert_eq!(tree[0].data.id, 1);

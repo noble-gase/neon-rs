@@ -1,4 +1,4 @@
-//! Redis 连接池：单节点与 Cluster（`cluster` feature）的 bb8 / r2d2 封装。
+//! Redis 连接池：单节点与 Cluster（`cluster` feature）的 bb8 / r2d2 封装
 
 use bb8::ManageConnection;
 

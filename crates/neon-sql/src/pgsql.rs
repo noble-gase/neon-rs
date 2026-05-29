@@ -1,4 +1,4 @@
-//! PostgreSQL CRUD helper（基于 sea-query + sqlx）。
+//! PostgreSQL CRUD helper（基于 sea-query + sqlx）
 
 use std::time::Instant;
 

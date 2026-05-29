@@ -1,4 +1,4 @@
-//! DES 对称加密（ECB + PKCS#7）。
+//! DES 对称加密（ECB + PKCS#7）
 
 use anyhow::anyhow;
 use cipher::{Array, BlockCipherDecrypt, BlockCipherEncrypt, KeyInit, consts::U8};

@@ -1,11 +1,11 @@
-//! 通过 HTTP Range 读取远程 ZIP：解析中央目录，按需拉取条目内容。
+//! 通过 HTTP Range 读取远程 ZIP：解析中央目录，按需拉取条目内容
 //!
 //! 打开流程概览：
 //! 1. `HEAD` 获取远程文件大小；
 //! 2. 读取文件尾部（最多 64 KiB）定位 EOCD；
 //! 3. 必要时解析 ZIP64 Locator / ZIP64 EOCD；
 //! 4. Range 拉取 Central Directory 并解析条目列表；
-//! 5. 对单个条目再 Range 读取 Local Header 与压缩数据并解压。
+//! 5. 对单个条目再 Range 读取 Local Header 与压缩数据并解压
 
 use std::io::{self, Read};
 use std::sync::{Arc, OnceLock};
@@ -15,33 +15,33 @@ use libflate::deflate::Decoder as DeflateDecoder;
 use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_RANGE, RANGE};
 
-/// EOCD 签名 `0x06054b50`（磁盘上小端字节序为 `50 4b 05 06`）。
+/// EOCD 签名 `0x06054b50`（磁盘上小端字节序为 `50 4b 05 06`）
 const EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
-/// ZIP64 EOCD Locator 签名 `0x07064b50`。
+/// ZIP64 EOCD Locator 签名 `0x07064b50`
 const ZIP64_LOCATOR_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x06, 0x07];
-/// ZIP64 EOCD 签名 `0x06064b50`。
+/// ZIP64 EOCD 签名 `0x06064b50`
 const ZIP64_EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x06, 0x06];
-/// Central Directory File Header 签名 `0x02014b50`。
+/// Central Directory File Header 签名 `0x02014b50`
 const CD_HEADER_SIGNATURE: u32 = 0x0201_4b50;
-/// 32 位字段放不下时写入的 ZIP64 占位值 `0xFFFFFFFF`。
+/// 32 位字段放不下时写入的 ZIP64 占位值 `0xFFFFFFFF`
 const ZIP64_SENTINEL: u32 = 0xFFFF_FFFF;
-/// 在文件尾部搜索 EOCD 的最大范围（ZIP 规范允许 comment 拖尾，通常不超过 64 KiB）。
+/// 在文件尾部搜索 EOCD 的最大范围（ZIP 规范允许 comment 拖尾，通常不超过 64 KiB）
 const TAIL_SEARCH_LIMIT: u64 = 64 * 1024;
-/// Store：无压缩。
+/// Store：无压缩
 const COMPRESSION_STORE: u16 = 0;
-/// Deflate（ZIP 中为原始 deflate 流，非 zlib 包装）。
+/// Deflate（ZIP 中为原始 deflate 流，非 zlib 包装）
 const COMPRESSION_DEFLATE: u16 = 8;
 
 static HTTP_CLIENT: OnceLock<Arc<Client>> = OnceLock::new();
 
-/// 在首次 HTTP 请求前安装全局客户端（仅可调用一次）。
+/// 在首次 HTTP 请求前安装全局客户端（仅可调用一次）
 pub fn set_http_client(client: Client) -> Result<()> {
     HTTP_CLIENT
         .set(Arc::new(client))
         .map_err(|_| anyhow::anyhow!("HTTP client already initialized"))
 }
 
-/// 默认 HTTP 客户端：跳过 TLS 证书校验，每主机较多空闲连接（适合大文件分片 Range）。
+/// 默认 HTTP 客户端：跳过 TLS 证书校验，每主机较多空闲连接（适合大文件分片 Range）
 fn build_default_client() -> Result<Client> {
     Client::builder()
         .danger_accept_invalid_certs(true)
@@ -66,31 +66,31 @@ struct ArchiveInner {
     url: String,
 }
 
-/// 远程 ZIP 归档（中央目录已解析）。
+/// 远程 ZIP 归档（中央目录已解析）
 pub struct RemoteArchive {
     inner: Arc<ArchiveInner>,
-    /// 远程 ZIP 总字节数（`Content-Length`）。
+    /// 远程 ZIP 总字节数（`Content-Length`）
     pub size: u64,
-    /// 中央目录中的条目列表。
+    /// 中央目录中的条目列表
     pub entries: Vec<ArchiveEntry>,
 }
 
-/// 中央目录里的一条文件记录。
+/// 中央目录里的一条文件记录
 pub struct ArchiveEntry {
-    /// 条目路径（相对路径，来自 Central Directory）。
+    /// 条目路径（相对路径，来自 Central Directory）
     pub name: String,
-    /// 压缩后大小（字节），对应 CD 的 compressed size。
+    /// 压缩后大小（字节），对应 CD 的 compressed size
     pub compressed_size: u64,
-    /// 解压后大小（字节），对应 CD 的 uncompressed size。
+    /// 解压后大小（字节），对应 CD 的 uncompressed size
     pub uncompressed_size: u64,
-    /// 压缩方式：`0` = Store，`8` = Deflate，其它见 ZIP 规范。
+    /// 压缩方式：`0` = Store，`8` = Deflate，其它见 ZIP 规范
     pub compression_method: u16,
-    /// Local File Header 在 ZIP 内的起始偏移（相对文件头）。
+    /// Local File Header 在 ZIP 内的起始偏移（相对文件头）
     local_header_offset: u64,
     inner: Arc<ArchiveInner>,
 }
 
-/// 条目正文流；`Drop` 时关闭底层 HTTP 响应体。
+/// 条目正文流；`Drop` 时关闭底层 HTTP 响应体
 pub struct EntryReader {
     body: Box<dyn Read + Send>,
 }
@@ -102,7 +102,7 @@ impl Read for EntryReader {
 }
 
 impl RemoteArchive {
-    /// 打开远程 ZIP 并解析中央目录。
+    /// 打开远程 ZIP 并解析中央目录
     ///
     /// ### EOCD（End of Central Directory）— 标准 ZIP
     ///
@@ -168,7 +168,7 @@ impl RemoteArchive {
 }
 
 impl ArchiveEntry {
-    /// 打开条目正文，返回可读流（Store 或 Deflate）。
+    /// 打开条目正文，返回可读流（Store 或 Deflate）
     pub fn open(&self) -> Result<EntryReader> {
         // 读取 Local File Header（固定 30 字节 + 预留文件名/extra）
         let header = self
@@ -201,7 +201,7 @@ impl ArchiveEntry {
     }
 }
 
-/// 获取远程对象大小：优先 HEAD 的 `Content-Length`，否则用 `Range: bytes=0-0` 解析 `Content-Range`。
+/// 获取远程对象大小：优先 HEAD 的 `Content-Length`，否则用 `Range: bytes=0-0` 解析 `Content-Range`
 fn fetch_content_length(client: &Client, url: &str) -> Result<u64> {
     let head = client.head(url).send().context("HEAD request")?;
     ensure!(head.status().is_success(), "HEAD failed: {}", head.status());
@@ -234,13 +234,13 @@ fn fetch_content_length(client: &Client, url: &str) -> Result<u64> {
     Ok(len)
 }
 
-/// 解析 `Content-Range` 总长度，例如 `bytes 0-0/740472096`。
+/// 解析 `Content-Range` 总长度，例如 `bytes 0-0/740472096`
 fn parse_content_range_total(value: &str) -> Option<u64> {
     let (_, total) = value.trim().split_once('/')?;
     total.parse().ok()
 }
 
-/// 在尾部缓冲中定位 EOCD，返回中央目录的 `(size, offset)`。
+/// 在尾部缓冲中定位 EOCD，返回中央目录的 `(size, offset)`
 fn locate_central_directory(inner: &ArchiveInner, tail: &[u8], size: u64) -> Result<(u64, u64)> {
     let eocd_idx = find_signature_tail(tail, &EOCD_SIGNATURE).context("EOCD not found")?;
     let eocd = &tail[eocd_idx..];
@@ -270,7 +270,7 @@ fn locate_central_directory(inner: &ArchiveInner, tail: &[u8], size: u64) -> Res
     Ok((cd_size, cd_offset))
 }
 
-/// 解析 Central Directory 二进制块，构建条目列表。
+/// 解析 Central Directory 二进制块，构建条目列表
 fn parse_central_directory(inner: &Arc<ArchiveInner>, data: &[u8]) -> Result<Vec<ArchiveEntry>> {
     let mut entries = Vec::new();
     let mut i = 0usize;
@@ -326,10 +326,10 @@ fn parse_central_directory(inner: &Arc<ArchiveInner>, data: &[u8]) -> Result<Vec
     Ok(entries)
 }
 
-/// 解析 ZIP64 Extended Information（extra 头 ID `0x0001`）。
+/// 解析 ZIP64 Extended Information（extra 头 ID `0x0001`）
 ///
 /// 数据区按顺序存放（仅当对应 CD 字段为 `0xFFFFFFFF` 时才出现）：
-/// 未压缩大小 → 压缩大小 → Local Header 偏移。
+/// 未压缩大小 → 压缩大小 → Local Header 偏移
 fn parse_zip64_extra(extra: &[u8], uncompressed_size: &mut u64, compressed_size: &mut u64, local_header_offset: &mut u64) -> Result<()> {
     let mut j = 0usize;
     while j + 4 <= extra.len() {
@@ -361,13 +361,13 @@ fn parse_zip64_extra(extra: &[u8], uncompressed_size: &mut u64, compressed_size:
     Ok(())
 }
 
-/// 在 `haystack` 中自后向前查找 `signature` 的首次出现位置。
+/// 在 `haystack` 中自后向前查找 `signature` 的首次出现位置
 fn find_signature_tail(haystack: &[u8], signature: &[u8]) -> Option<usize> {
     haystack.windows(signature.len()).rposition(|window| window == signature)
 }
 
 impl ArchiveInner {
-    /// `Range: bytes=start-end`（含端点），将响应体读入内存。
+    /// `Range: bytes=start-end`（含端点），将响应体读入内存
     fn fetch_range(&self, start: u64, end: u64) -> Result<Vec<u8>> {
         let response = self
             .client
@@ -379,7 +379,7 @@ impl ArchiveInner {
         Ok(response.bytes().context("read range body")?.to_vec())
     }
 
-    /// `Range: bytes=start-end`，返回响应体流（用于 Store / Deflate，避免整段进内存）。
+    /// `Range: bytes=start-end`，返回响应体流（用于 Store / Deflate，避免整段进内存）
     fn fetch_range_stream(&self, start: u64, end: u64) -> Result<Box<dyn Read + Send>> {
         let response = self
             .client

@@ -1,4 +1,4 @@
-//! 对称/非对称加密与哈希工具（按 feature 启用子模块）。
+//! 对称/非对称加密与哈希工具（按 feature 启用子模块）
 
 #[cfg(feature = "aes")]
 pub mod aes;
@@ -12,7 +12,7 @@ pub mod rsa;
 #[cfg(any(feature = "aes", feature = "des"))]
 use base64::{Engine, prelude::BASE64_STANDARD as B64};
 
-/// 加密结果（封装 ciphertext + 可选 GCM tag 长度）。
+/// 加密结果（封装 ciphertext + 可选 GCM tag 长度）
 #[cfg(any(feature = "aes", feature = "des"))]
 #[derive(Debug, Clone)]
 pub struct CipherText {
@@ -22,27 +22,27 @@ pub struct CipherText {
 
 #[cfg(any(feature = "aes", feature = "des"))]
 impl CipherText {
-    /// 原始密文字节。
+    /// 原始密文字节
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// GCM 真实数据部分（不含 tag）；非 GCM 模式时与 [`bytes`](Self::bytes) 相同。
+    /// GCM 真实数据部分（不含 tag）；非 GCM 模式时与 [`bytes`](Self::bytes) 相同
     pub fn data(&self) -> &[u8] {
         &self.bytes[..self.bytes.len().saturating_sub(self.tag_size)]
     }
 
-    /// GCM tag 部分；非 GCM 模式（`tag_size == 0`）时返回空切片。
+    /// GCM tag 部分；非 GCM 模式（`tag_size == 0`）时返回空切片
     pub fn tag(&self) -> &[u8] {
         &self.bytes[self.bytes.len().saturating_sub(self.tag_size)..]
     }
 
-    /// 消费并返回原始密文字节。
+    /// 消费并返回原始密文字节
     pub fn into_bytes(self) -> Vec<u8> {
         self.bytes
     }
 
-    /// 密文是否为空。
+    /// 密文是否为空
     pub fn is_empty(&self) -> bool {
         self.bytes.is_empty()
     }
@@ -56,7 +56,7 @@ impl AsRef<[u8]> for CipherText {
 }
 
 #[cfg(any(feature = "aes", feature = "des"))]
-/// 以标准 Base64 显示完整密文字节（含 GCM tag）。
+/// 以标准 Base64 显示完整密文字节（含 GCM tag）
 impl std::fmt::Display for CipherText {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&B64.encode(&self.bytes))

@@ -1,4 +1,4 @@
-//! SQL 连接池（按后端 feature 启用 [`Factory`] 实现）。
+//! SQL 连接池（按后端 feature 启用 [`Factory`] 实现）
 
 use std::{sync::OnceLock, time::Duration};
 
@@ -102,7 +102,7 @@ where
     }
 }
 
-/// 包装 `execute` 结果（如 `rows_affected`）并触发 SQL 日志。
+/// 包装 `execute` 结果（如 `rows_affected`）并触发 SQL 日志
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
 pub(crate) fn trace_execute_result<R, F>(sql: String, cost: Duration, ret: Result<R, sqlx::Error>, map_ok: F) -> anyhow::Result<u64>
 where
@@ -121,7 +121,7 @@ where
     }
 }
 
-/// 包装查询类 SQL 结果并触发 [`set_sql_logger`] 回调。
+/// 包装查询类 SQL 结果并触发 [`set_sql_logger`] 回调
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
 pub(crate) fn trace_query_result<T>(sql: String, cost: Duration, ret: Result<T, sqlx::Error>) -> anyhow::Result<T> {
     match ret {

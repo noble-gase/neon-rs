@@ -1,4 +1,4 @@
-//! SQL 工具集：连接池与基于 sea-query 的 CRUD helper（按后端 feature 启用）。
+//! SQL 工具集：连接池与基于 sea-query 的 CRUD helper（按后端 feature 启用）
 
 pub mod factory;
 
@@ -91,13 +91,14 @@ where
     Ok(pool)
 }
 
-/// `insert` 的执行结果。
+/// `insert` 的执行结果
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InsertOutcome<T> {
-    /// 插入成功。`T` 为后端返回值：MySQL `last_insert_id`、SQLite `last_insert_rowid`、
-    /// PostgreSQL 为 `RETURNING` 映射的行类型。
+    /// 插入成功
+    ///
+    /// `T` 为后端返回值：MySQL `last_insert_id`、SQLite `last_insert_rowid`、PostgreSQL 为 `RETURNING` 映射的行类型
     Inserted(T),
-    /// 唯一约束冲突（`is_unique_violation`），视为幂等重复。
+    /// 唯一约束冲突（`is_unique_violation`），视为幂等重复
     Duplicate,
 }
 

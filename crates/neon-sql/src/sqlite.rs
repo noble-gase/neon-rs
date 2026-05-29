@@ -1,4 +1,4 @@
-//! SQLite CRUD helper（基于 sea-query + sqlx）。
+//! SQLite CRUD helper（基于 sea-query + sqlx）
 
 use std::time::Instant;
 

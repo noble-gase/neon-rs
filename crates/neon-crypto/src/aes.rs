@@ -1,13 +1,11 @@
-//! AES 对称加密（CBC / ECB / GCM）。
+//! AES 对称加密（CBC / ECB / GCM）
 
 use aes::{Aes128, Aes192, Aes256};
 use aes_gcm::aead::{Aead, KeyInit, Payload};
 use aes_gcm::{AesGcm, Nonce};
 use anyhow::anyhow;
-use cipher::{
-    Array, BlockCipherDecrypt, BlockCipherEncrypt, BlockModeDecrypt, BlockModeEncrypt, BlockSizeUser, KeyIvInit, consts::U16,
-};
 use cipher::typenum::{U12, U13, U14, U15, U16 as TagU16};
+use cipher::{Array, BlockCipherDecrypt, BlockCipherEncrypt, BlockModeDecrypt, BlockModeEncrypt, BlockSizeUser, KeyIvInit, consts::U16};
 
 use crate::{CipherText, pkcs7_padding, pkcs7_unpadding};
 

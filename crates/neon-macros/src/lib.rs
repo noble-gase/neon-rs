@@ -1,4 +1,4 @@
-//! 过程宏：为 sqlx 模型生成辅助 derive。
+//! 过程宏：为 sqlx 模型生成辅助 derive
 
 mod derives;
 

@@ -1,4 +1,4 @@
-//! MySQL CRUD helper（基于 sea-query + sqlx）。
+//! MySQL CRUD helper（基于 sea-query + sqlx）
 
 use std::time::Instant;
 

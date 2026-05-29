@@ -1,8 +1,8 @@
-//! 基于 Redis `SET NX` + TTL 的分布式互斥锁。
+//! 基于 Redis `SET NX` + TTL 的分布式互斥锁
 //!
 //! **注意**：这不是 Antirez 的多 master quorum Redlock 算法；
-//! 仅在单个 Redis 实例 或 Redis Cluster 上通过单 key 互斥，不提供跨独立 Redis 实例的 quorum 语义。
-//! 未获锁时 [`RedLock::acquire`](RedLock::acquire) / [`AsyncRedLock::acquire`](AsyncRedLock::acquire) 返回 `Ok(None)`，不保证公平排队。
+//! 仅在单个 Redis 实例 或 Redis Cluster 上通过单 key 互斥，不提供跨独立 Redis 实例的 quorum 语义
+//! 未获锁时 [`RedLock::acquire`](RedLock::acquire) / [`AsyncRedLock::acquire`](AsyncRedLock::acquire) 返回 `Ok(None)`，不保证公平排队
 
 #[cfg(feature = "sync-lock")]
 use redis::Commands;
@@ -77,7 +77,7 @@ impl RedLock {
         Ok(Some(self))
     }
 
-    /// 阻塞式重试获取锁。
+    /// 阻塞式重试获取锁
     ///
     /// `attempts` 为最大尝试次数；相邻两次尝试间隔 `duration`
     pub fn try_acquire(mut self, attempts: usize, duration: time::Duration) -> anyhow::Result<Option<Self>> {
@@ -113,7 +113,7 @@ impl RedLock {
         }
     }
 
-    /// 调用 `prevent` 后，Drop 时不会自动释放锁。
+    /// 调用 `prevent` 后，Drop 时不会自动释放锁
     pub fn prevent(&mut self) {
         self.prevent = true;
     }
@@ -164,7 +164,7 @@ impl RedLock {
     }
 }
 
-/// 自动释放锁。
+/// 自动释放锁
 #[cfg(feature = "sync-lock")]
 impl Drop for RedLock {
     fn drop(&mut self) {
@@ -231,7 +231,7 @@ impl AsyncRedLock {
         Ok(Some(self))
     }
 
-    /// 异步重试获取锁。
+    /// 异步重试获取锁
     ///
     /// `attempts` 为最大尝试次数；相邻两次尝试间隔 `duration`
     pub async fn try_acquire(mut self, attempts: usize, duration: time::Duration) -> anyhow::Result<Option<Self>> {
@@ -267,7 +267,7 @@ impl AsyncRedLock {
         }
     }
 
-    /// 调用 `prevent` 后，Drop 时不会自动释放锁。
+    /// 调用 `prevent` 后，Drop 时不会自动释放锁
     pub fn prevent(&mut self) {
         self.prevent = true;
     }
@@ -356,7 +356,7 @@ impl Drop for AsyncRedLock {
     }
 }
 
-// `AsyncDrop` 稳定后可替换上方 `tokio::spawn` 方案，在 drop 中 await 释放锁。
+// `AsyncDrop` 稳定后可替换上方 `tokio::spawn` 方案，在 drop 中 await 释放锁
 // impl AsyncDrop for AsyncRedLock {
 //     fn drop(&mut self) {
 //         if self.prevent || self.token.is_none() {

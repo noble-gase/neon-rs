@@ -12,7 +12,7 @@ use spki::SubjectPublicKeyInfoOwned;
 use x509_cert::Certificate;
 use x509_cert::der::Decode;
 
-/// PKCS#1 RSA 私钥 PEM 标签。
+/// PKCS#1 RSA 私钥 PEM 标签
 pub const RSA_PRIVATE_KEY: &str = "RSA PRIVATE KEY";
 /// PKCS#8 私钥 PEM 标签
 pub const PRIVATE_KEY: &str = "PRIVATE KEY";

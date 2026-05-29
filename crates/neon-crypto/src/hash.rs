@@ -1,4 +1,4 @@
-//! 哈希/HMAC 工具；输出可为 hex 字符串或原始字节。
+//! 哈希/HMAC 工具；输出可为 hex 字符串或原始字节
 
 use digest::Digest;
 use digest::KeyInit;

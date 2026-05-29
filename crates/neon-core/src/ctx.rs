@@ -1,6 +1,6 @@
 use std::panic::Location;
 
-/// 为错误消息附加调用位置（`文件:行号`）。
+/// 为错误消息附加调用位置（`文件:行号`）
 #[track_caller]
 pub fn wrap(msg: impl AsRef<str>) -> String {
     let loc = Location::caller();

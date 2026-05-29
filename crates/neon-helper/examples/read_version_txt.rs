@@ -1,4 +1,4 @@
-//! 从远程 ZIP 读取 `version.txt`。
+//! 从远程 ZIP 读取 `version.txt`
 //!
 //! ```bash
 //! cargo run -p neon-helper --example read_version_txt

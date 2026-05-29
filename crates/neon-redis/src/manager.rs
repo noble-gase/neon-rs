@@ -1,4 +1,4 @@
-/// bb8 单节点 Redis 连接管理器。
+/// bb8 单节点 Redis 连接管理器
 #[derive(Clone)]
 pub struct RedisConnManager {
     client: redis::Client,
@@ -35,7 +35,7 @@ impl bb8::ManageConnection for RedisConnManager {
 use redis::{cluster, cluster_async};
 
 #[cfg(feature = "cluster")]
-/// bb8 Redis Cluster 连接管理器。
+/// bb8 Redis Cluster 连接管理器
 #[derive(Clone)]
 pub struct RedisClusterManager {
     client: cluster::ClusterClient,

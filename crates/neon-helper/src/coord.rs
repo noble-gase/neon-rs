@@ -1,4 +1,4 @@
-//! 地理坐标与大地平面直角坐标转换、距离与方位角计算。
+//! 地理坐标与大地平面直角坐标转换、距离与方位角计算
 
 use std::fmt;
 use std::sync::OnceLock;
@@ -11,12 +11,12 @@ const FALSE_EASTING: f64 = 500_000.0;
 const UTM_SCALE: f64 = 0.9996;
 const INV_A0_EPS: f64 = 1e-8;
 
-/// 大地平面直角坐标系点。
+/// 大地平面直角坐标系点
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
-    /// 中央子午线（度），用于投影反算。
+    /// 中央子午线（度），用于投影反算
     pub meridian: i32,
 }
 
@@ -36,7 +36,7 @@ impl fmt::Display for Point {
     }
 }
 
-/// 地理坐标（经纬度，单位：度）。
+/// 地理坐标（经纬度，单位：度）
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Location {
     pub lng: f64,
@@ -48,7 +48,7 @@ impl Location {
         Self { lng, lat }
     }
 
-    /// 球面距离（米）。
+    /// 球面距离（米）
     pub fn distance(self, other: Location) -> f64 {
         let lng1 = self.lng * DEG_TO_RAD;
         let lat1 = self.lat * DEG_TO_RAD;
@@ -59,7 +59,7 @@ impl Location {
         cos_dist.clamp(-1.0, 1.0).acos() * WGS84_A
     }
 
-    /// 方位角（0～360 度）。
+    /// 方位角（0～360 度）
     pub fn azimuth(self, other: Location) -> f64 {
         if other.lng == self.lng && other.lat == self.lat {
             return 0.0;
@@ -97,7 +97,7 @@ impl fmt::Display for Location {
     }
 }
 
-/// 投影类型。
+/// 投影类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Projection {
     GaussKruger,
@@ -146,7 +146,7 @@ impl Ellipsoid {
     }
 }
 
-/// WGS84 经纬度与大地平面直角坐标间的投影转换。
+/// WGS84 经纬度与大地平面直角坐标间的投影转换
 #[derive(Debug, Clone, Copy)]
 pub struct GeoTransform {
     ellipsoid: Ellipsoid,
@@ -163,7 +163,7 @@ impl GeoTransform {
         }
     }
 
-    /// 经纬度 → 大地平面直角坐标。
+    /// 经纬度 → 大地平面直角坐标
     pub fn bl2xy(&self, loc: Location) -> Point {
         let ep = self.ellipsoid;
         let mut meridian = self.meridian;
@@ -215,7 +215,7 @@ impl GeoTransform {
         Point::with_meridian(x, y, meridian)
     }
 
-    /// 大地平面直角坐标 → 经纬度。
+    /// 大地平面直角坐标 → 经纬度
     pub fn xy2bl(&self, point: Point) -> Location {
         let ep = self.ellipsoid;
         let mut x = point.x - FALSE_EASTING;
