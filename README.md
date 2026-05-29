@@ -45,7 +45,7 @@ cargo add neon-rs --features "crypto,macros,redis,sql-mysql"
 
 ### PostgreSQL 插入
 
-`pgsql::insert` / `batch_insert` 通过 `query_as` 读取结果，**INSERT 语句须包含 `RETURNING`**（例如 `.returning_all()` 或 `.returning_col(...)`）
+`pgsql::insert` / `batch_insert` 通过 `query_as` 读取结果，**INSERT 语句须包含 `RETURNING`**（例如：`.returning_all()` 或 `.returning_col(...)`）
 
 ## Macros
 
