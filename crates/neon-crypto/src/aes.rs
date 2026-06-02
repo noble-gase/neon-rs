@@ -2,8 +2,10 @@
 
 use aes::{Aes128, Aes192, Aes256};
 use aes_gcm::aead::{Aead, KeyInit, Payload};
-use aes_gcm::{AesGcm, Nonce};
+use aes_gcm::{AesGcm, Nonce, TagSize};
 use anyhow::anyhow;
+use cipher::array::ArraySize;
+use cipher::block_padding::Pkcs7;
 use cipher::typenum::{U12, U13, U14, U15, U16 as TagU16};
 use cipher::{Array, BlockCipherDecrypt, BlockCipherEncrypt, BlockModeDecrypt, BlockModeEncrypt, BlockSizeUser, KeyIvInit, consts::U16};
 
@@ -24,7 +26,7 @@ impl AesKey {
             16 => Aes128::new_from_slice(key).map(AesKey::K128).map_err(anyhow::Error::from),
             24 => Aes192::new_from_slice(key).map(AesKey::K192).map_err(anyhow::Error::from),
             32 => Aes256::new_from_slice(key).map(AesKey::K256).map_err(anyhow::Error::from),
-            _ => Err(anyhow!("invalid AES key size: {}", key.len())),
+            n => Err(anyhow!("invalid AES key size: {}", n)),
         }
     }
 }
@@ -36,9 +38,15 @@ type Aes192CbcDec = cbc::Decryptor<Aes192>;
 type Aes256CbcEnc = cbc::Encryptor<Aes256>;
 type Aes256CbcDec = cbc::Decryptor<Aes256>;
 
-/// AES-CBC 加密（PKCS#7 padding，默认 block_size 16，可自定义）
+// --------- CBC ---------
+
+/// AES-CBC 加密（PKCS#7 padding，默认 padding 边界为 block_size=16，可自定义为更大的倍数）
+///
+/// `padding_size`:
+/// - `None` 或 `Some(16)`：走 cipher 内置的 PKCS#7 批处理路径，效率最高
+/// - `Some(n)`：`n` 必须为 16 的整数倍，按 `n` 字节对齐做 PKCS#7 padding
 pub fn aes_encrypt_cbc(
-    key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>, data: impl AsRef<[u8]>, padding_size: Option<u8>,
+    key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>, data: impl AsRef<[u8]>, padding_size: Option<usize>,
 ) -> anyhow::Result<CipherText> {
     let key = key.as_ref();
     let iv = iv.as_ref();
@@ -47,122 +55,162 @@ pub fn aes_encrypt_cbc(
         return Err(anyhow!("IV length must equal block size"));
     }
 
-    let pad_size = padding_size.map(|v| v as usize).unwrap_or(BLOCK_SIZE);
-
-    let mut buf = data.to_vec();
-    pkcs7_padding(&mut buf, pad_size);
-    if !buf.len().is_multiple_of(BLOCK_SIZE) {
-        return Err(anyhow!("input not full blocks"));
-    }
-
-    let out = match key.len() {
-        16 => encrypt_cbc_blocks(Aes128CbcEnc::new_from_slices(key, iv), &mut buf),
-        24 => encrypt_cbc_blocks(Aes192CbcEnc::new_from_slices(key, iv), &mut buf),
-        32 => encrypt_cbc_blocks(Aes256CbcEnc::new_from_slices(key, iv), &mut buf),
-        _ => return Err(anyhow!("invalid AES key size: {}", key.len())),
-    }?;
-    Ok(CipherText { bytes: out, tag_size: 0 })
+    let bytes = match padding_size {
+        None | Some(BLOCK_SIZE) => cbc_encrypt_pkcs7(key, iv, data)?,
+        Some(pad) => cbc_encrypt_padded(key, iv, data, pad)?,
+    };
+    Ok(CipherText { bytes, tag_size: 0 })
 }
 
-fn encrypt_cbc_blocks<E>(enc: Result<E, cipher::InvalidLength>, buf: &mut [u8]) -> anyhow::Result<Vec<u8>>
+fn cbc_encrypt_pkcs7(key: &[u8], iv: &[u8], data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    match key.len() {
+        16 => Ok(Aes128CbcEnc::new_from_slices(key, iv)?.encrypt_padded_vec::<Pkcs7>(data)),
+        24 => Ok(Aes192CbcEnc::new_from_slices(key, iv)?.encrypt_padded_vec::<Pkcs7>(data)),
+        32 => Ok(Aes256CbcEnc::new_from_slices(key, iv)?.encrypt_padded_vec::<Pkcs7>(data)),
+        n => Err(anyhow!("invalid AES key size: {}", n)),
+    }
+}
+
+fn cbc_encrypt_padded(key: &[u8], iv: &[u8], data: &[u8], pad_size: usize) -> anyhow::Result<Vec<u8>> {
+    if pad_size == 0 || !pad_size.is_multiple_of(BLOCK_SIZE) {
+        return Err(anyhow!("padding_size must be a positive multiple of {BLOCK_SIZE}"));
+    }
+    let mut buf = data.to_vec();
+    pkcs7_padding(&mut buf, pad_size)?;
+    match key.len() {
+        16 => cbc_encrypt_blocks_in_place(Aes128CbcEnc::new_from_slices(key, iv)?, &mut buf),
+        24 => cbc_encrypt_blocks_in_place(Aes192CbcEnc::new_from_slices(key, iv)?, &mut buf),
+        32 => cbc_encrypt_blocks_in_place(Aes256CbcEnc::new_from_slices(key, iv)?, &mut buf),
+        n => return Err(anyhow!("invalid AES key size: {}", n)),
+    }
+    Ok(buf)
+}
+
+fn cbc_encrypt_blocks_in_place<E>(mut enc: E, buf: &mut [u8])
 where
     E: BlockModeEncrypt + BlockSizeUser<BlockSize = U16>,
 {
-    let mut enc = enc.map_err(anyhow::Error::from)?;
-    for block in buf.chunks_mut(BLOCK_SIZE) {
-        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
-        enc.encrypt_block(block);
-    }
-    Ok(buf.to_vec())
+    let (blocks, _) = Array::<u8, U16>::slice_as_chunks_mut(buf);
+    enc.encrypt_blocks(blocks);
 }
 
 /// AES-CBC 解密（PKCS#7 unpadding）
-pub fn aes_decrypt_cbc(key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<Vec<u8>> {
+///
+/// `padding_size` 必须与加密时使用的值一致：
+/// - `None` 或 `Some(16)`：走 cipher 内置的 PKCS#7 批处理路径
+/// - `Some(n)`：`n` 必须为 16 的正整倍数，严格验证 pad 在 `1..=n` 范围内
+pub fn aes_decrypt_cbc(
+    key: impl AsRef<[u8]>, iv: impl AsRef<[u8]>, data: impl AsRef<[u8]>, padding_size: Option<usize>,
+) -> anyhow::Result<Vec<u8>> {
     let key = key.as_ref();
     let iv = iv.as_ref();
     let data = data.as_ref();
     if iv.len() != BLOCK_SIZE {
         return Err(anyhow!("IV length must equal block size"));
     }
-
     if !data.len().is_multiple_of(BLOCK_SIZE) {
         return Err(anyhow!("input not full blocks"));
     }
 
+    match padding_size {
+        None | Some(BLOCK_SIZE) => cbc_decrypt_pkcs7(key, iv, data),
+        Some(pad) => cbc_decrypt_padded(key, iv, data, pad),
+    }
+}
+
+fn cbc_decrypt_pkcs7(key: &[u8], iv: &[u8], data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    match key.len() {
+        16 => Aes128CbcDec::new_from_slices(key, iv)?
+            .decrypt_padded_vec::<Pkcs7>(data)
+            .map_err(|e| anyhow!("cbc decrypt: {e}")),
+        24 => Aes192CbcDec::new_from_slices(key, iv)?
+            .decrypt_padded_vec::<Pkcs7>(data)
+            .map_err(|e| anyhow!("cbc decrypt: {e}")),
+        32 => Aes256CbcDec::new_from_slices(key, iv)?
+            .decrypt_padded_vec::<Pkcs7>(data)
+            .map_err(|e| anyhow!("cbc decrypt: {e}")),
+        n => Err(anyhow!("invalid AES key size: {}", n)),
+    }
+}
+
+fn cbc_decrypt_padded(key: &[u8], iv: &[u8], data: &[u8], pad_size: usize) -> anyhow::Result<Vec<u8>> {
+    if pad_size == 0 || !pad_size.is_multiple_of(BLOCK_SIZE) {
+        return Err(anyhow!("padding_size must be a positive multiple of {BLOCK_SIZE}"));
+    }
+    if !data.len().is_multiple_of(pad_size) {
+        return Err(anyhow!("input length is not a multiple of padding_size"));
+    }
     let mut out = data.to_vec();
     match key.len() {
-        16 => decrypt_cbc_blocks(Aes128CbcDec::new_from_slices(key, iv), &mut out)?,
-        24 => decrypt_cbc_blocks(Aes192CbcDec::new_from_slices(key, iv), &mut out)?,
-        32 => decrypt_cbc_blocks(Aes256CbcDec::new_from_slices(key, iv), &mut out)?,
-        _ => return Err(anyhow!("invalid AES key size: {}", key.len())),
-    };
-    pkcs7_unpadding(&mut out)?;
+        16 => cbc_decrypt_blocks_in_place(Aes128CbcDec::new_from_slices(key, iv)?, &mut out),
+        24 => cbc_decrypt_blocks_in_place(Aes192CbcDec::new_from_slices(key, iv)?, &mut out),
+        32 => cbc_decrypt_blocks_in_place(Aes256CbcDec::new_from_slices(key, iv)?, &mut out),
+        n => return Err(anyhow!("invalid AES key size: {}", n)),
+    }
+    pkcs7_unpadding(&mut out, pad_size)?;
     Ok(out)
 }
 
-fn decrypt_cbc_blocks<D>(dec: Result<D, cipher::InvalidLength>, buf: &mut [u8]) -> anyhow::Result<()>
+fn cbc_decrypt_blocks_in_place<D>(mut dec: D, buf: &mut [u8])
 where
     D: BlockModeDecrypt + BlockSizeUser<BlockSize = U16>,
 {
-    let mut dec = dec.map_err(anyhow::Error::from)?;
-    for block in buf.chunks_mut(BLOCK_SIZE) {
-        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
-        dec.decrypt_block(block);
-    }
-    Ok(())
+    let (blocks, _) = Array::<u8, U16>::slice_as_chunks_mut(buf);
+    dec.decrypt_blocks(blocks);
 }
 
-/// AES-ECB 加密（PKCS#7）
-pub fn aes_encrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>, padding_size: Option<u8>) -> anyhow::Result<CipherText> {
-    let key = key.as_ref();
-    let data = data.as_ref();
-    let cipher = AesKey::new(key)?;
-    let pad_size = padding_size.map(|v| v as usize).unwrap_or(BLOCK_SIZE);
+// --------- ECB ---------
 
-    let mut buf = data.to_vec();
-    pkcs7_padding(&mut buf, pad_size);
-    if !buf.len().is_multiple_of(BLOCK_SIZE) {
-        return Err(anyhow!("input not full blocks"));
+/// AES-ECB 加密（PKCS#7）
+pub fn aes_encrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>, padding_size: Option<usize>) -> anyhow::Result<CipherText> {
+    let cipher = AesKey::new(key.as_ref())?;
+    let pad_size = padding_size.unwrap_or(BLOCK_SIZE);
+    if pad_size == 0 || !pad_size.is_multiple_of(BLOCK_SIZE) {
+        return Err(anyhow!("padding_size must be a positive multiple of {BLOCK_SIZE}"));
     }
 
-    for block in buf.chunks_mut(BLOCK_SIZE) {
-        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
-        match &cipher {
-            AesKey::K128(c) => c.encrypt_block(block),
-            AesKey::K192(c) => c.encrypt_block(block),
-            AesKey::K256(c) => c.encrypt_block(block),
-        }
+    let mut buf = data.as_ref().to_vec();
+    pkcs7_padding(&mut buf, pad_size)?;
+
+    let (blocks, _) = Array::<u8, U16>::slice_as_chunks_mut(&mut buf);
+    match &cipher {
+        AesKey::K128(c) => c.encrypt_blocks(blocks),
+        AesKey::K192(c) => c.encrypt_blocks(blocks),
+        AesKey::K256(c) => c.encrypt_blocks(blocks),
     }
     Ok(CipherText { bytes: buf, tag_size: 0 })
 }
 
 /// AES-ECB 解密
-pub fn aes_decrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<Vec<u8>> {
-    let key = key.as_ref();
+///
+/// `padding_size` 必须与加密时使用的值一致（`None` 等价于 `Some(16)`）
+pub fn aes_decrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>, padding_size: Option<usize>) -> anyhow::Result<Vec<u8>> {
     let data = data.as_ref();
-    let cipher = AesKey::new(key)?;
-    if !data.len().is_multiple_of(BLOCK_SIZE) {
-        return Err(anyhow!("input not full blocks"));
+    let pad_size = padding_size.unwrap_or(BLOCK_SIZE);
+    if pad_size == 0 || !pad_size.is_multiple_of(BLOCK_SIZE) {
+        return Err(anyhow!("padding_size must be a positive multiple of {BLOCK_SIZE}"));
     }
+    if !data.len().is_multiple_of(pad_size) {
+        return Err(anyhow!("input length is not a multiple of padding_size"));
+    }
+    let cipher = AesKey::new(key.as_ref())?;
 
     let mut out = data.to_vec();
-    for block in out.chunks_mut(BLOCK_SIZE) {
-        let block = Array::<u8, U16>::slice_as_mut_array(block).ok_or_else(|| anyhow!("invalid block size"))?;
-        match &cipher {
-            AesKey::K128(c) => c.decrypt_block(block),
-            AesKey::K192(c) => c.decrypt_block(block),
-            AesKey::K256(c) => c.decrypt_block(block),
-        }
+    let (blocks, _) = Array::<u8, U16>::slice_as_chunks_mut(&mut out);
+    match &cipher {
+        AesKey::K128(c) => c.decrypt_blocks(blocks),
+        AesKey::K192(c) => c.decrypt_blocks(blocks),
+        AesKey::K256(c) => c.decrypt_blocks(blocks),
     }
-    pkcs7_unpadding(&mut out)?;
+    pkcs7_unpadding(&mut out, pad_size)?;
     Ok(out)
 }
+
+// --------- GCM ---------
 
 /// AES-GCM 选项
 ///
 /// 字段为 `0` 表示使用默认值（nonce=12，tag=16）
-/// 当 `tag_size` 与 `nonce_size` 同时非零时，与 Go 版一致，优先采用 `tag_size` 解析规则，
-/// 但 `nonce_size` 仍会生效（不再被忽略）
 #[derive(Debug, Clone, Copy)]
 pub struct GcmOption {
     /// 非默认 tag 大小（12..=16），`0` 表示 16
@@ -180,20 +228,19 @@ impl Default for GcmOption {
     }
 }
 
-/// AES-GCM 加密默认 NonceSize=12，TagSize=16
+/// AES-GCM 加密；默认 NonceSize=12，TagSize=16
 pub fn aes_encrypt_gcm(
     key: impl AsRef<[u8]>, nonce: impl AsRef<[u8]>, data: impl AsRef<[u8]>, aad: impl AsRef<[u8]>, opt: Option<&GcmOption>,
 ) -> anyhow::Result<CipherText> {
-    let key = key.as_ref();
-    let nonce = nonce.as_ref();
-    let data = data.as_ref();
-    let aad = aad.as_ref();
     let (nonce_size, tag_size) = resolve_gcm_sizes(opt)?;
-    if nonce.len() != nonce_size {
-        return Err(anyhow!("incorrect nonce length given to GCM"));
-    }
-
-    let ct = gcm_seal(key, nonce, data, aad, nonce_size, tag_size)?;
+    let call = GcmCall {
+        key: key.as_ref(),
+        nonce: nonce.as_ref(),
+        data: data.as_ref(),
+        aad: aad.as_ref(),
+        seal: true,
+    };
+    let ct = gcm_op(call, nonce_size, tag_size)?;
     Ok(CipherText { bytes: ct, tag_size })
 }
 
@@ -201,24 +248,24 @@ pub fn aes_encrypt_gcm(
 pub fn aes_decrypt_gcm(
     key: impl AsRef<[u8]>, nonce: impl AsRef<[u8]>, data: impl AsRef<[u8]>, aad: impl AsRef<[u8]>, opt: Option<&GcmOption>,
 ) -> anyhow::Result<Vec<u8>> {
-    let key = key.as_ref();
-    let nonce = nonce.as_ref();
-    let data = data.as_ref();
-    let aad = aad.as_ref();
     let (nonce_size, tag_size) = resolve_gcm_sizes(opt)?;
-    if nonce.len() != nonce_size {
-        return Err(anyhow!("incorrect nonce length given to GCM"));
-    }
-
-    gcm_open(key, nonce, data, aad, nonce_size, tag_size)
+    let call = GcmCall {
+        key: key.as_ref(),
+        nonce: nonce.as_ref(),
+        data: data.as_ref(),
+        aad: aad.as_ref(),
+        seal: false,
+    };
+    gcm_op(call, nonce_size, tag_size)
 }
 
 fn resolve_gcm_sizes(opt: Option<&GcmOption>) -> anyhow::Result<(usize, usize)> {
     let (nonce_size, tag_size) = match opt {
-        Some(o) if o.tag_size != 0 && o.nonce_size == 0 => (GCM_NONCE_SIZE, o.tag_size),
-        Some(o) if o.nonce_size != 0 && o.tag_size == 0 => (o.nonce_size, 16),
-        Some(o) if o.tag_size != 0 && o.nonce_size != 0 => (o.nonce_size, o.tag_size),
-        _ => (GCM_NONCE_SIZE, 16),
+        Some(o) => (
+            if o.nonce_size == 0 { GCM_NONCE_SIZE } else { o.nonce_size },
+            if o.tag_size == 0 { 16 } else { o.tag_size },
+        ),
+        None => (GCM_NONCE_SIZE, 16),
     };
     if !(12..=16).contains(&nonce_size) {
         return Err(anyhow!("invalid GCM nonce size"));
@@ -229,59 +276,68 @@ fn resolve_gcm_sizes(opt: Option<&GcmOption>) -> anyhow::Result<(usize, usize)> 
     Ok((nonce_size, tag_size))
 }
 
-fn gcm_seal(key: &[u8], nonce: &[u8], data: &[u8], aad: &[u8], nonce_size: usize, tag_size: usize) -> anyhow::Result<Vec<u8>> {
-    gcm_op(key, nonce, data, aad, nonce_size, tag_size, true)
+struct GcmCall<'a> {
+    key: &'a [u8],
+    nonce: &'a [u8],
+    data: &'a [u8],
+    aad: &'a [u8],
+    seal: bool,
 }
 
-fn gcm_open(key: &[u8], nonce: &[u8], data: &[u8], aad: &[u8], nonce_size: usize, tag_size: usize) -> anyhow::Result<Vec<u8>> {
-    gcm_op(key, nonce, data, aad, nonce_size, tag_size, false)
+fn gcm_op(call: GcmCall<'_>, nonce_size: usize, tag_size: usize) -> anyhow::Result<Vec<u8>> {
+    match call.key.len() {
+        16 => gcm_dispatch_nonce::<Aes128>(call, nonce_size, tag_size),
+        24 => gcm_dispatch_nonce::<Aes192>(call, nonce_size, tag_size),
+        32 => gcm_dispatch_nonce::<Aes256>(call, nonce_size, tag_size),
+        n => Err(anyhow!("invalid AES key size: {}", n)),
+    }
 }
 
-fn gcm_op(key: &[u8], nonce: &[u8], data: &[u8], aad: &[u8], nonce_size: usize, tag_size: usize, seal: bool) -> anyhow::Result<Vec<u8>> {
-    macro_rules! gcm_run {
-        ($aes:ty, $ns:ty, $ts:ty) => {{
-            let cipher = AesGcm::<$aes, $ns, $ts>::new_from_slice(key).map_err(anyhow::Error::from)?;
-            let n = Nonce::<$ns>::try_from(nonce).map_err(|_| anyhow!("incorrect nonce length given to GCM"))?;
-            let payload = Payload { msg: data, aad };
-            if seal {
-                cipher.encrypt(&n, payload).map_err(|e| anyhow!(e.to_string()))
-            } else {
-                cipher.decrypt(&n, payload).map_err(|e| anyhow!(e.to_string()))
-            }
-        }};
+fn gcm_dispatch_nonce<A>(call: GcmCall<'_>, nonce_size: usize, tag_size: usize) -> anyhow::Result<Vec<u8>>
+where
+    A: BlockCipherEncrypt + BlockSizeUser<BlockSize = U16> + KeyInit,
+{
+    match nonce_size {
+        12 => gcm_dispatch_tag::<A, U12>(call, tag_size),
+        13 => gcm_dispatch_tag::<A, U13>(call, tag_size),
+        14 => gcm_dispatch_tag::<A, U14>(call, tag_size),
+        15 => gcm_dispatch_tag::<A, U15>(call, tag_size),
+        16 => gcm_dispatch_tag::<A, TagU16>(call, tag_size),
+        _ => Err(anyhow!("unsupported nonce size")),
     }
+}
 
-    macro_rules! gcm_for_tag {
-        ($aes:ty, $ns:ty) => {
-            match tag_size {
-                12 => gcm_run!($aes, $ns, U12),
-                13 => gcm_run!($aes, $ns, U13),
-                14 => gcm_run!($aes, $ns, U14),
-                15 => gcm_run!($aes, $ns, U15),
-                16 => gcm_run!($aes, $ns, TagU16),
-                _ => Err(anyhow!("unsupported tag size")),
-            }
-        };
+fn gcm_dispatch_tag<A, N>(call: GcmCall<'_>, tag_size: usize) -> anyhow::Result<Vec<u8>>
+where
+    A: BlockCipherEncrypt + BlockSizeUser<BlockSize = U16> + KeyInit,
+    N: ArraySize,
+{
+    match tag_size {
+        12 => gcm_run::<A, N, U12>(call),
+        13 => gcm_run::<A, N, U13>(call),
+        14 => gcm_run::<A, N, U14>(call),
+        15 => gcm_run::<A, N, U15>(call),
+        16 => gcm_run::<A, N, TagU16>(call),
+        _ => Err(anyhow!("unsupported tag size")),
     }
+}
 
-    macro_rules! gcm_for_key {
-        ($aes:ty) => {
-            match nonce_size {
-                12 => gcm_for_tag!($aes, U12),
-                13 => gcm_for_tag!($aes, U13),
-                14 => gcm_for_tag!($aes, U14),
-                15 => gcm_for_tag!($aes, U15),
-                16 => gcm_for_tag!($aes, TagU16),
-                _ => Err(anyhow!("unsupported nonce size")),
-            }
-        };
-    }
-
-    match key.len() {
-        16 => gcm_for_key!(Aes128),
-        24 => gcm_for_key!(Aes192),
-        32 => gcm_for_key!(Aes256),
-        _ => Err(anyhow!("invalid AES key size: {}", key.len())),
+fn gcm_run<A, N, T>(call: GcmCall<'_>) -> anyhow::Result<Vec<u8>>
+where
+    A: BlockCipherEncrypt + BlockSizeUser<BlockSize = U16> + KeyInit,
+    N: ArraySize,
+    T: TagSize,
+{
+    let cipher = AesGcm::<A, N, T>::new_from_slice(call.key).map_err(anyhow::Error::from)?;
+    let nonce = Nonce::<N>::try_from(call.nonce).map_err(|_| anyhow!("incorrect nonce length given to GCM"))?;
+    let payload = Payload {
+        msg: call.data,
+        aad: call.aad,
+    };
+    if call.seal {
+        cipher.encrypt(&nonce, payload).map_err(|e| anyhow!(e.to_string()))
+    } else {
+        cipher.decrypt(&nonce, payload).map_err(|e| anyhow!(e.to_string()))
     }
 }
 
@@ -299,13 +355,21 @@ mod tests {
         let iv = &KEY.as_bytes()[..16];
         let ct = aes_encrypt_cbc(key, iv, DATA.as_bytes(), None).unwrap();
         assert_eq!(ct.to_string(), "WDq8s1qdHCML8YLhfdmGRw==");
-        let pt = aes_decrypt_cbc(key, iv, ct.bytes()).unwrap();
+        let pt = aes_decrypt_cbc(key, iv, ct.bytes(), None).unwrap();
         assert_eq!(pt, DATA.as_bytes());
 
         let ct2 = aes_encrypt_cbc(key, iv, DATA.as_bytes(), Some(32)).unwrap();
         assert_eq!(ct2.to_string(), "vjemH/hxbwNh+WXhkKseCu2GrM4O6bnaaKv59wgkRSE=");
-        let pt2 = aes_decrypt_cbc(key, iv, ct2.bytes()).unwrap();
+        let pt2 = aes_decrypt_cbc(key, iv, ct2.bytes(), Some(32)).unwrap();
         assert_eq!(pt2, DATA.as_bytes());
+    }
+
+    #[test]
+    fn cbc_invalid_padding_size() {
+        let key = KEY.as_bytes();
+        let iv = &KEY.as_bytes()[..16];
+        let err = aes_encrypt_cbc(key, iv, DATA.as_bytes(), Some(17)).unwrap_err();
+        assert!(err.to_string().contains("padding_size"));
     }
 
     #[test]
@@ -313,11 +377,13 @@ mod tests {
         let key = KEY.as_bytes();
         let ct = aes_encrypt_ecb(key, DATA.as_bytes(), None).unwrap();
         assert_eq!(ct.to_string(), "oYDjdGHY8lK1/sJo750Waw==");
-        let pt = aes_decrypt_ecb(key, ct.bytes()).unwrap();
+        let pt = aes_decrypt_ecb(key, ct.bytes(), None).unwrap();
         assert_eq!(pt, DATA.as_bytes());
 
         let ct2 = aes_encrypt_ecb(key, DATA.as_bytes(), Some(32)).unwrap();
         assert_eq!(ct2.to_string(), "u0iDWHM8JMnRyJNCiCzKJNib2cOjUrx2FqMjmg3ZTZA=");
+        let pt2 = aes_decrypt_ecb(key, ct2.bytes(), Some(32)).unwrap();
+        assert_eq!(pt2, DATA.as_bytes());
     }
 
     #[test]

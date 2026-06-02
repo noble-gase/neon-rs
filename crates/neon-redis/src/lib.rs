@@ -2,14 +2,14 @@
 //!
 //! `redlock` 为单 key 互斥锁（`SET NX` + TTL），非 Antirez quorum Redlock
 
-use std::time::Duration;
-
-use crate::factory::Factory;
-
 pub mod factory;
 pub mod manager;
 pub mod redkit;
 pub mod redlock;
+
+use std::time::Duration;
+
+use crate::factory::Factory;
 
 /// 同步分布式锁 [`redlock::RedLock`] 使用的连接池（Single / Cluster，需 `sync-lock` feature）
 #[cfg(feature = "sync-lock")]

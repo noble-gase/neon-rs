@@ -1,6 +1,6 @@
 [package]
 name = "neon-rs"
-version = "0.0.2"
+version = "0.1.0"
 edition = { workspace = true }
 authors = ["ShengHui <847713844@qq.com>"]
 keywords = ["crypto", "hash", "redis", "redlock", "sql"]
@@ -25,16 +25,16 @@ proc-macro2 = "1"
 
 # common
 tokio = "1"
-anyhow = "1.0"
+anyhow = "1"
 tracing = "0.1"
-serde = "1.0"
-serde_json = "1.0"
+serde = "1"
+serde_json = "1"
 jiff = "0.2"
 time = "0.3"
-uuid = "1.23"
+uuid = "1"
 rand = "0.10"
 getrandom = "0.4"
-const-hex = "1.19"
+const-hex = "1"
 base64 = "0.22"
 pem = "3"
 reqwest = { version = "0.13", default-features = false }
@@ -61,11 +61,11 @@ hmac = "0.13"
 
 # sql
 sqlx = { version = "0.9", default-features = false }
-sea-query = { version = "1.0.0-rc.34", git = "https://github.com/SeaQL/sea-query", rev = "9da59def0025", default-features = false }
-sea-query-sqlx = { version = "0.8.0-rc.16", git = "https://github.com/SeaQL/sea-query", rev = "9da59def0025", default-features = false }
+sea-query = { version = "1", default-features = false }
+sea-query-sqlx = { version = "0.9", default-features = false }
 
 # redis
-redis = { version = "1.2", default-features = false }
+redis = { version = "1", default-features = false }
 r2d2 = "0.8"
 bb8 = "0.9"
 

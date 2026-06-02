@@ -98,8 +98,33 @@ pub enum InsertOutcome<T> {
     ///
     /// `T` 为后端返回值：MySQL `last_insert_id`、SQLite `last_insert_rowid`、PostgreSQL 为 `RETURNING` 映射的行类型
     Inserted(T),
-    /// 唯一约束冲突（`is_unique_violation`），视为幂等重复
+    /// 唯一约束冲突
     Duplicate,
+}
+
+impl<T> InsertOutcome<T> {
+    /// 是否为 [`InsertOutcome::Inserted`]
+    #[inline]
+    pub fn is_inserted(&self) -> bool {
+        matches!(self, Self::Inserted(_))
+    }
+
+    /// 是否为 [`InsertOutcome::Duplicate`]
+    #[inline]
+    pub fn is_duplicate(&self) -> bool {
+        matches!(self, Self::Duplicate)
+    }
+
+    /// 消费自身，成功则返回 `Some(value)`，唯一约束冲突返回 `None`
+    ///
+    /// 进一步可链式使用 `Option` 的 `unwrap_or` / `ok_or` / `map` 等方法
+    #[inline]
+    pub fn inserted(self) -> Option<T> {
+        match self {
+            Self::Inserted(v) => Some(v),
+            Self::Duplicate => None,
+        }
+    }
 }
 
 /// 判断 `sqlx::Error` 是否为唯一约束冲突
@@ -118,6 +143,7 @@ pub fn is_unique_violation_anyhow(err: &anyhow::Error) -> bool {
 mod tests {
     use std::time::Duration;
 
+    use crate::InsertOutcome;
     use crate::set_sql_logger;
 
     #[test]
@@ -134,5 +160,18 @@ mod tests {
                 }
             }
         })
+    }
+
+    #[test]
+    fn insert_outcome_helpers() {
+        let ok: InsertOutcome<u64> = InsertOutcome::Inserted(42);
+        assert!(ok.is_inserted());
+        assert!(!ok.is_duplicate());
+        assert_eq!(ok.inserted(), Some(42));
+
+        let dup: InsertOutcome<u64> = InsertOutcome::Duplicate;
+        assert!(dup.is_duplicate());
+        assert!(!dup.is_inserted());
+        assert_eq!(dup.inserted(), None);
     }
 }

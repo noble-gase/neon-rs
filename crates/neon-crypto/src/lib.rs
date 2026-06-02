@@ -63,27 +63,35 @@ impl std::fmt::Display for CipherText {
     }
 }
 
+/// PKCS#7 填充
 #[cfg(any(feature = "aes", feature = "des"))]
-fn pkcs7_padding(data: &mut Vec<u8>, block_size: usize) {
-    let mut pad = block_size - data.len() % block_size;
-    if pad == 0 {
-        pad = block_size
+fn pkcs7_padding(data: &mut Vec<u8>, block_size: usize) -> anyhow::Result<()> {
+    if !(1..=255).contains(&block_size) {
+        return Err(anyhow::anyhow!("invalid block size"));
     }
+
+    let pad = block_size - data.len() % block_size;
     data.extend(std::iter::repeat_n(pad as u8, pad));
+    Ok(())
 }
 
+/// PKCS#7 去填充
 #[cfg(any(feature = "aes", feature = "des"))]
-fn pkcs7_unpadding(data: &mut Vec<u8>) -> anyhow::Result<()> {
+fn pkcs7_unpadding(data: &mut Vec<u8>, block_size: usize) -> anyhow::Result<()> {
+    if !(1..=255).contains(&block_size) {
+        return Err(anyhow::anyhow!("invalid block size"));
+    }
+
     let len = data.len();
-    if len == 0 {
-        return Err(anyhow::anyhow!("empty data for unpadding"));
+    if len == 0 || !len.is_multiple_of(block_size) {
+        return Err(anyhow::anyhow!("invalid data length"));
     }
 
     let pad = data[len - 1] as usize;
-    if pad == 0 || pad > len {
+    if pad == 0 || pad > block_size {
         return Err(anyhow::anyhow!("invalid padding"));
     }
-    if !data[len - pad..].iter().all(|&b| b == pad as u8) {
+    if data[len - pad..].iter().any(|&b| b as usize != pad) {
         return Err(anyhow::anyhow!("invalid padding"));
     }
     data.truncate(len - pad);
@@ -97,6 +105,40 @@ mod tests {
     #[test]
     fn pkcs7_invalid_padding_bytes() {
         let mut data = b"hello\x03\x02\x03".to_vec();
-        assert!(pkcs7_unpadding(&mut data).is_err());
+        assert!(pkcs7_unpadding(&mut data, 8).is_err());
+    }
+
+    #[test]
+    fn pkcs7_padding_roundtrip() {
+        for block_size in [8usize, 16, 32] {
+            for data_len in 0..=64 {
+                let mut buf: Vec<u8> = (0..data_len as u8).collect();
+                let orig = buf.clone();
+                pkcs7_padding(&mut buf, block_size).unwrap();
+                assert!(buf.len().is_multiple_of(block_size));
+                pkcs7_unpadding(&mut buf, block_size).unwrap();
+                assert_eq!(buf, orig);
+            }
+        }
+    }
+
+    #[test]
+    fn pkcs7_invalid_block_size() {
+        let mut data = vec![1u8; 16];
+        assert!(pkcs7_padding(&mut data, 0).is_err());
+        assert!(pkcs7_padding(&mut data, 256).is_err());
+        assert!(pkcs7_unpadding(&mut data, 0).is_err());
+        assert!(pkcs7_unpadding(&mut data, 256).is_err());
+    }
+
+    #[test]
+    fn pkcs7_unpadding_rejects_pad_exceeding_block_size() {
+        // 伪造数据“末字节 = 0x12 = 18”：strict 模式下 block_size=16 不接受 pad>16
+        let mut data = vec![0x12u8; 32];
+        assert!(pkcs7_unpadding(&mut data, 16).is_err());
+        // 但在 block_size=32 下 pad=18 是合法的，去填充后应剩 32-18=14 个 0x12
+        let mut data = vec![0x12u8; 32];
+        pkcs7_unpadding(&mut data, 32).unwrap();
+        assert_eq!(data, vec![0x12u8; 14]);
     }
 }

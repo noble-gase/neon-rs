@@ -6,9 +6,9 @@ pub mod tree;
 pub mod zoned;
 
 /// 生成随机串（size 应为偶数）
-pub fn nonce(size: u8) -> String {
+pub fn nonce(size: usize) -> String {
     let len = size / 2;
-    let mut buf = vec![0u8; len as usize];
+    let mut buf = vec![0u8; len];
     getrandom::fill(&mut buf).expect("failed to read random bytes");
     const_hex::encode(buf)
 }

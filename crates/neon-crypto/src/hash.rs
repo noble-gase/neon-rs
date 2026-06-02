@@ -8,80 +8,68 @@ use md5::Md5;
 use sha1::Sha1;
 use sha2::Sha256;
 
-/// 控制哈希结果的输出形式
-pub trait HashOutput {
-    type Output;
-    fn from_digest(bytes: &[u8]) -> Self::Output;
+/// 控制哈希结果的输出形式（`Vec<u8>` 原始字节 / `String` hex）
+pub trait HashOutput: Sized {
+    fn from_digest(bytes: &[u8]) -> Self;
 }
 
 impl HashOutput for Vec<u8> {
-    type Output = Vec<u8>;
-    fn from_digest(bytes: &[u8]) -> Self::Output {
+    #[inline]
+    fn from_digest(bytes: &[u8]) -> Self {
         bytes.to_vec()
     }
 }
 
 impl HashOutput for String {
-    type Output = String;
-    fn from_digest(bytes: &[u8]) -> Self::Output {
+    #[inline]
+    fn from_digest(bytes: &[u8]) -> Self {
         const_hex::encode(bytes)
     }
 }
 
 /// 计算 MD5；`T = String` 时返回 hex，`T = Vec<u8>` 时返回原始字节
-pub fn md5<T: HashOutput>(data: impl AsRef<[u8]>) -> T::Output {
-    let mut h = Md5::new();
-    Digest::update(&mut h, data);
-    T::from_digest(h.finalize().as_ref())
+pub fn md5<T: HashOutput>(data: impl AsRef<[u8]>) -> T {
+    hash::<Md5, T>(data)
 }
 
 /// 计算 SHA-1
-pub fn sha1<T: HashOutput>(data: impl AsRef<[u8]>) -> T::Output {
-    let mut h = Sha1::new();
-    Digest::update(&mut h, data);
-    T::from_digest(h.finalize().as_ref())
+pub fn sha1<T: HashOutput>(data: impl AsRef<[u8]>) -> T {
+    hash::<Sha1, T>(data)
 }
 
 /// 计算 SHA-256
-pub fn sha256<T: HashOutput>(data: impl AsRef<[u8]>) -> T::Output {
-    let mut h = Sha256::new();
-    Digest::update(&mut h, data);
-    T::from_digest(h.finalize().as_ref())
+pub fn sha256<T: HashOutput>(data: impl AsRef<[u8]>) -> T {
+    hash::<Sha256, T>(data)
 }
 
 /// 使用指定 `Digest` 算法计算哈希
-pub fn hash<D: Digest, T: HashOutput>(data: impl AsRef<[u8]>) -> T::Output {
+pub fn hash<D: Digest, T: HashOutput>(data: impl AsRef<[u8]>) -> T {
     let mut h = D::new();
     Digest::update(&mut h, data);
     T::from_digest(h.finalize().as_ref())
 }
 
 /// HMAC-SHA1
-pub fn hmac_sha1<T: HashOutput>(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<T::Output> {
-    hmac_from_slice::<Sha1, T>(key, data)
+pub fn hmac_sha1<T: HashOutput>(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<T> {
+    hmac::<Sha1, T>(key, data)
 }
 
 /// HMAC-SHA256
-pub fn hmac_sha256<T: HashOutput>(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<T::Output> {
-    hmac_from_slice::<Sha256, T>(key, data)
+pub fn hmac_sha256<T: HashOutput>(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<T> {
+    hmac::<Sha256, T>(key, data)
 }
 
 /// 使用指定 `Digest` 算法计算 HMAC
-pub fn hmac<D: Digest + digest::block_api::BlockSizeUser, T: HashOutput>(
-    key: impl AsRef<[u8]>, data: impl AsRef<[u8]>,
-) -> anyhow::Result<T::Output> {
-    hmac_from_slice::<D, T>(key, data)
-}
-
-fn hmac_from_slice<D, T>(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<T::Output>
+pub fn hmac<D, T>(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<T>
 where
     D: Digest + digest::block_api::BlockSizeUser,
     T: HashOutput,
 {
-    if key.as_ref().is_empty() {
+    let key = key.as_ref();
+    if key.is_empty() {
         return Err(anyhow::anyhow!("HMAC key must not be empty"));
     }
-    let mut h = SimpleHmac::<D>::new_from_slice(key.as_ref()).map_err(anyhow::Error::from)?;
+    let mut h = SimpleHmac::<D>::new_from_slice(key).map_err(anyhow::Error::from)?;
     h.update(data.as_ref());
     Ok(T::from_digest(h.finalize().into_bytes().as_ref()))
 }

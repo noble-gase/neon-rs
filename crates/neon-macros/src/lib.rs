@@ -6,7 +6,7 @@ use proc_macro::TokenStream;
 
 use crate::derives::model;
 
-/// 为 struct 生成 sqlx 相关的辅助实现
+/// 为 struct 生成 sqlx model
 ///
 /// 配合 `#[model(...)]` 属性使用，详见 `derives::model`
 #[proc_macro_derive(Model, attributes(model))]
