@@ -2,7 +2,7 @@
 //!
 //! 底层为 `BTreeMap<String, String>`，key 按 ASCII 字典序排列
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ops::{Deref, DerefMut};
 
 /// 参数字典（key 按字典序排序）
@@ -31,6 +31,11 @@ pub struct EncodeOptions {
 impl Params {
     pub fn new() -> Self {
         Self(BTreeMap::new())
+    }
+
+    /// 从 `HashMap` 构造 Params（key 会按 ASCII 字典序排序）
+    pub fn from_hash_map(map: HashMap<String, String>) -> Self {
+        Self(map.into_iter().collect())
     }
 
     /// 从 URL query 字符串解析为 Params
@@ -160,6 +165,15 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(params.encode("=", "&", opts), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn from_hash_map_sorted_encode() {
+        let mut map = HashMap::new();
+        map.insert("foo".into(), "quux".into());
+        map.insert("bar".into(), "baz".into());
+        let params = Params::from_hash_map(map);
+        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
     }
 
     #[test]
