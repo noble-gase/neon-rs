@@ -25,6 +25,3 @@ target
 
 # Added by MacOS
 .DS_Store
-
-# Added by cargo
-/target
