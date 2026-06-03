@@ -33,23 +33,6 @@ impl Params {
         Self(BTreeMap::new())
     }
 
-    /// 从 `HashMap` 构造 Params（key 会按 ASCII 字典序排序）
-    pub fn from_hash_map(map: &HashMap<String, String>) -> Self {
-        Self(map.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-    }
-
-    /// 从 URL query 字符串解析为 Params
-    ///
-    /// 注意：重复 key 时保留**首次**出现的 value
-    pub fn from_url_query(query: impl AsRef<str>) -> Self {
-        let parsed = form_urlencoded::parse(query.as_ref().as_bytes());
-        let mut inner = BTreeMap::new();
-        for (k, v) in parsed {
-            inner.entry(k.into_owned()).or_insert_with(|| v.into_owned());
-        }
-        Self(inner)
-    }
-
     /// 按指定符号与分隔符编码签名串（按 key ASCII 升序）
     pub fn encode(&self, sym: impl AsRef<str>, sep: impl AsRef<str>, opts: EncodeOptions) -> String {
         if self.0.is_empty() {
@@ -82,6 +65,28 @@ impl Params {
         buf
     }
 
+    /// 从 `HashMap` 构造 Params（key 会按 ASCII 字典序排序）
+    pub fn from_hash_map(map: &HashMap<String, String>) -> Self {
+        Self(map.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+    }
+
+    /// 转为 `HashMap`
+    pub fn to_hash_map(&self) -> HashMap<String, String> {
+        self.0.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+
+    /// 从 URL query 字符串解析为 Params
+    ///
+    /// 注意：重复 key 时保留**首次**出现的 value
+    pub fn from_url_query(query: impl AsRef<str>) -> Self {
+        let parsed = form_urlencoded::parse(query.as_ref().as_bytes());
+        let mut inner = BTreeMap::new();
+        for (k, v) in parsed {
+            inner.entry(k.into_owned()).or_insert_with(|| v.into_owned());
+        }
+        Self(inner)
+    }
+
     /// URL 编码
     pub fn url_encode(&self) -> String {
         let mut ser = form_urlencoded::Serializer::new(String::new());
@@ -95,6 +100,12 @@ impl Params {
 impl From<HashMap<String, String>> for Params {
     fn from(map: HashMap<String, String>) -> Self {
         Self(map.into_iter().collect())
+    }
+}
+
+impl From<Params> for HashMap<String, String> {
+    fn from(params: Params) -> Self {
+        params.0.into_iter().collect()
     }
 }
 
@@ -190,6 +201,27 @@ mod tests {
         map.insert("bar".into(), "baz".into());
         let params = Params::from(map);
         assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn to_hash_map_borrowed() {
+        let mut params = Params::new();
+        params.insert("foo".into(), "quux".into());
+        params.insert("bar".into(), "baz".into());
+        let map = params.to_hash_map();
+        assert_eq!(map.get("foo"), Some(&"quux".to_string()));
+        assert_eq!(map.get("bar"), Some(&"baz".to_string()));
+        assert_eq!(params.len(), 2);
+    }
+
+    #[test]
+    fn to_hash_map_owned_roundtrip() {
+        let mut expected = HashMap::new();
+        expected.insert("foo".into(), "quux".into());
+        expected.insert("bar".into(), "baz".into());
+        let params = Params::from(expected.clone());
+        let map: HashMap<_, _> = params.into();
+        assert_eq!(map, expected);
     }
 
     #[test]
