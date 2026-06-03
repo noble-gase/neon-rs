@@ -39,6 +39,7 @@ base64 = "0.22"
 pem = "3"
 reqwest = { version = "0.13", default-features = false }
 libflate = "2.3"
+form_urlencoded = "1"
 
 # crypto
 aes = "0.9"

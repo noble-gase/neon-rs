@@ -1,0 +1,189 @@
+//! 参数字典，用于生成签名串
+//!
+//! 底层为 `BTreeMap<String, String>`，key 按 ASCII 字典序排列
+
+use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
+
+/// 参数字典（key 按字典序排序）
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Params(BTreeMap<String, String>);
+
+/// 签名 encode 时 value 为空字符串的处理策略
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum EmptyMode {
+    /// 默认：`bar=baz&foo=`
+    #[default]
+    Default,
+    /// 忽略：`bar=baz`
+    Ignore,
+    /// 仅保留 key：`bar=baz&foo`
+    OnlyKey,
+}
+
+/// 签名 encode 选项
+#[derive(Debug, Default, Clone)]
+pub struct EncodeOptions {
+    pub empty_mode: EmptyMode,
+    pub ignore_keys: Vec<String>,
+}
+
+impl Params {
+    pub fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    /// 从 URL query 字符串解析为 Params
+    ///
+    /// 注意：重复 key 时保留**首次**出现的 value
+    pub fn from_url_query(query: impl AsRef<str>) -> Self {
+        let parsed = form_urlencoded::parse(query.as_ref().as_bytes());
+        let mut inner = BTreeMap::new();
+        for (k, v) in parsed {
+            inner.entry(k.into_owned()).or_insert_with(|| v.into_owned());
+        }
+        Self(inner)
+    }
+
+    /// 按指定符号与分隔符编码签名串（按 key ASCII 升序）
+    pub fn encode(&self, sym: impl AsRef<str>, sep: impl AsRef<str>, opts: EncodeOptions) -> String {
+        if self.0.is_empty() {
+            return String::new();
+        }
+
+        let sym = sym.as_ref();
+        let sep = sep.as_ref();
+        let mut buf = String::new();
+        buf.reserve(self.0.iter().map(|(k, v)| k.len() + v.len() + sym.len() + sep.len()).sum());
+
+        for (k, v) in self.0.iter() {
+            if opts.ignore_keys.contains(k) {
+                continue;
+            }
+            if v.is_empty() && opts.empty_mode == EmptyMode::Ignore {
+                continue;
+            }
+            if !buf.is_empty() {
+                buf.push_str(sep);
+            }
+            buf.push_str(k);
+            if !v.is_empty() {
+                buf.push_str(sym);
+                buf.push_str(v);
+            } else if opts.empty_mode != EmptyMode::OnlyKey {
+                buf.push_str(sym);
+            }
+        }
+        buf
+    }
+
+    /// URL 编码
+    pub fn url_encode(&self) -> String {
+        let mut ser = form_urlencoded::Serializer::new(String::new());
+        for (k, v) in self.0.iter() {
+            ser.append_pair(k, v);
+        }
+        ser.finish()
+    }
+}
+
+impl Deref for Params {
+    type Target = BTreeMap<String, String>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Params {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encode_default() {
+        let mut params = Params::new();
+        params.insert("foo".into(), "quux".into());
+        params.insert("bar".into(), "baz".into());
+        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn encode_empty() {
+        assert_eq!(Params::new().encode("=", "&", EncodeOptions::default()), "");
+        assert_eq!(Params::new().url_encode(), "");
+    }
+
+    #[test]
+    fn encode_empty_modes() {
+        let mut params = Params::new();
+        params.insert("foo".into(), "".into());
+        params.insert("bar".into(), "baz".into());
+        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=");
+        assert_eq!(
+            params.encode(
+                "=",
+                "&",
+                EncodeOptions {
+                    empty_mode: EmptyMode::Ignore,
+                    ..Default::default()
+                }
+            ),
+            "bar=baz"
+        );
+        assert_eq!(
+            params.encode(
+                "=",
+                "&",
+                EncodeOptions {
+                    empty_mode: EmptyMode::OnlyKey,
+                    ..Default::default()
+                }
+            ),
+            "bar=baz&foo"
+        );
+    }
+
+    #[test]
+    fn encode_ignore_keys() {
+        let mut params = Params::new();
+        params.insert("foo".into(), "quux".into());
+        params.insert("bar".into(), "baz".into());
+        params.insert("sign".into(), "xx".into());
+        let opts = EncodeOptions {
+            ignore_keys: vec!["sign".into()],
+            ..Default::default()
+        };
+        assert_eq!(params.encode("=", "&", opts), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn from_url_query_duplicate_keys() {
+        let params = Params::from_url_query("foo=first&foo=second&bar=baz");
+        assert_eq!(params.get("foo"), Some(&"first".to_string()));
+        assert_eq!(params.get("bar"), Some(&"baz".to_string()));
+    }
+
+    #[test]
+    fn url_encode_format() {
+        let mut params = Params::new();
+        params.insert("a".into(), "1 2".into());
+        params.insert("b".into(), "c&d".into());
+        assert_eq!(params.url_encode(), "a=1+2&b=c%26d");
+    }
+
+    #[test]
+    fn url_encode_roundtrip() {
+        let mut params = Params::new();
+        params.insert("a".into(), "1 2".into());
+        params.insert("b".into(), "c&d".into());
+        let back = Params::from_url_query(params.url_encode());
+        assert_eq!(back.get("a"), Some(&"1 2".to_string()));
+        assert_eq!(back.get("b"), Some(&"c&d".to_string()));
+    }
+}
