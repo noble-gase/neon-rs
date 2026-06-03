@@ -34,8 +34,8 @@ impl Params {
     }
 
     /// 从 `HashMap` 构造 Params（key 会按 ASCII 字典序排序）
-    pub fn from_hash_map(map: HashMap<String, String>) -> Self {
-        Self(map.into_iter().collect())
+    pub fn from_hash_map(map: &HashMap<String, String>) -> Self {
+        Self(map.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
     }
 
     /// 从 URL query 字符串解析为 Params
@@ -89,6 +89,12 @@ impl Params {
             ser.append_pair(k, v);
         }
         ser.finish()
+    }
+}
+
+impl From<HashMap<String, String>> for Params {
+    fn from(map: HashMap<String, String>) -> Self {
+        Self(map.into_iter().collect())
     }
 }
 
@@ -172,7 +178,17 @@ mod tests {
         let mut map = HashMap::new();
         map.insert("foo".into(), "quux".into());
         map.insert("bar".into(), "baz".into());
-        let params = Params::from_hash_map(map);
+        let params = Params::from_hash_map(&map);
+        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn from_hash_map_owned() {
+        let mut map = HashMap::new();
+        map.insert("foo".into(), "quux".into());
+        map.insert("bar".into(), "baz".into());
+        let params = Params::from(map);
         assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
     }
 
