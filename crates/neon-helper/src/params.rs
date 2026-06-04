@@ -3,6 +3,7 @@
 //! 底层为 `BTreeMap<String, String>`，key 按 ASCII 字典序排列
 
 use std::collections::{BTreeMap, HashMap};
+use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 
 /// 参数字典（key 按字典序排序）
@@ -34,13 +35,17 @@ impl Params {
     }
 
     /// 按指定符号与分隔符编码签名串（按 key ASCII 升序）
-    pub fn encode(&self, sym: impl AsRef<str>, sep: impl AsRef<str>, opts: EncodeOptions) -> String {
+    ///
+    /// `opt` 为 `None` 时使用 [`EncodeOptions::default()`]。
+    pub fn encode(&self, sym: impl AsRef<str>, sep: impl AsRef<str>, opt: Option<EncodeOptions>) -> String {
         if self.0.is_empty() {
             return String::new();
         }
 
         let sym = sym.as_ref();
         let sep = sep.as_ref();
+        let opts = opt.unwrap_or_default();
+
         let mut buf = String::new();
         buf.reserve(self.0.iter().map(|(k, v)| k.len() + v.len() + sym.len() + sep.len()).sum());
 
@@ -51,6 +56,7 @@ impl Params {
             if v.is_empty() && opts.empty_mode == EmptyMode::Ignore {
                 continue;
             }
+
             if !buf.is_empty() {
                 buf.push_str(sep);
             }
@@ -58,16 +64,46 @@ impl Params {
             if !v.is_empty() {
                 buf.push_str(sym);
                 buf.push_str(v);
-            } else if opts.empty_mode != EmptyMode::OnlyKey {
+                continue;
+            }
+            // 保留符号
+            if opts.empty_mode != EmptyMode::OnlyKey {
                 buf.push_str(sym);
             }
         }
+
         buf
     }
 
+    /// 从 `(key, value)` 迭代器构造 Params（key 会按 ASCII 字典序排序）
+    ///
+    /// `K`、`V` 需实现 [`AsRef<str>`]（如 [`String`]、`&str`）。重复 key 时保留**首次**出现的 value。
+    pub fn from_pairs<I, K, V>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let mut inner = BTreeMap::new();
+        for (k, v) in iter {
+            inner.entry(k.as_ref().to_owned()).or_insert_with(|| v.as_ref().to_owned());
+        }
+        Self(inner)
+    }
+
     /// 从 `HashMap` 构造 Params（key 会按 ASCII 字典序排序）
-    pub fn from_hash_map(map: &HashMap<String, String>) -> Self {
-        Self(map.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+    ///
+    /// `K`、`V` 需实现 [`AsRef<str>`]（如 [`String`]、`&str`）。
+    pub fn from_hash_map<K, V>(map: &HashMap<K, V>) -> Self
+    where
+        K: Eq + Hash + AsRef<str>,
+        V: AsRef<str>,
+    {
+        Self(
+            map.iter()
+                .map(|(k, v)| (k.as_ref().to_owned(), v.as_ref().to_owned()))
+                .collect(),
+        )
     }
 
     /// 转为 `HashMap`
@@ -97,9 +133,13 @@ impl Params {
     }
 }
 
-impl From<HashMap<String, String>> for Params {
-    fn from(map: HashMap<String, String>) -> Self {
-        Self(map.into_iter().collect())
+impl<K, V> From<HashMap<K, V>> for Params
+where
+    K: Eq + Hash + Into<String>,
+    V: Into<String>,
+{
+    fn from(map: HashMap<K, V>) -> Self {
+        Self(map.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
     }
 }
 
@@ -132,12 +172,12 @@ mod tests {
         let mut params = Params::new();
         params.insert("foo".into(), "quux".into());
         params.insert("bar".into(), "baz".into());
-        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
     }
 
     #[test]
     fn encode_empty() {
-        assert_eq!(Params::new().encode("=", "&", EncodeOptions::default()), "");
+        assert_eq!(Params::new().encode("=", "&", None), "");
         assert_eq!(Params::new().url_encode(), "");
     }
 
@@ -146,15 +186,15 @@ mod tests {
         let mut params = Params::new();
         params.insert("foo".into(), "".into());
         params.insert("bar".into(), "baz".into());
-        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=");
+        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=");
         assert_eq!(
             params.encode(
                 "=",
                 "&",
-                EncodeOptions {
+                Some(EncodeOptions {
                     empty_mode: EmptyMode::Ignore,
                     ..Default::default()
-                }
+                })
             ),
             "bar=baz"
         );
@@ -162,10 +202,10 @@ mod tests {
             params.encode(
                 "=",
                 "&",
-                EncodeOptions {
+                Some(EncodeOptions {
                     empty_mode: EmptyMode::OnlyKey,
                     ..Default::default()
-                }
+                })
             ),
             "bar=baz&foo"
         );
@@ -181,26 +221,77 @@ mod tests {
             ignore_keys: vec!["sign".into()],
             ..Default::default()
         };
-        assert_eq!(params.encode("=", "&", opts), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", Some(opts)), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn encode_ignore_keys_str_and_string() {
+        let mut params = Params::new();
+        params.insert("foo".into(), "quux".into());
+        params.insert("sign".into(), "xx".into());
+        let opts = EncodeOptions {
+            ignore_keys: vec!["sign".into(), String::from("nonce")],
+            ..Default::default()
+        };
+        assert_eq!(params.encode("=", "&", Some(opts)), "foo=quux");
     }
 
     #[test]
     fn from_hash_map_sorted_encode() {
-        let mut map = HashMap::new();
+        let mut map: HashMap<String, String> = HashMap::new();
         map.insert("foo".into(), "quux".into());
         map.insert("bar".into(), "baz".into());
         let params = Params::from_hash_map(&map);
-        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
         assert_eq!(map.len(), 2);
     }
 
     #[test]
     fn from_hash_map_owned() {
-        let mut map = HashMap::new();
+        let mut map: HashMap<String, String> = HashMap::new();
         map.insert("foo".into(), "quux".into());
         map.insert("bar".into(), "baz".into());
         let params = Params::from(map);
-        assert_eq!(params.encode("=", "&", EncodeOptions::default()), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn from_hash_map_str_refs() {
+        let mut map = HashMap::new();
+        map.insert("foo", "quux");
+        map.insert("bar", "baz");
+        let params = Params::from_hash_map(&map);
+        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+        let params = Params::from(map);
+        assert_eq!(params.get("foo"), Some(&"quux".to_string()));
+    }
+
+    #[test]
+    fn from_hash_map_mixed_string_and_str() {
+        let mut map: HashMap<String, &str> = HashMap::new();
+        map.insert("foo".into(), "quux");
+        map.insert("bar".into(), "baz");
+        let params = Params::from_hash_map(&map);
+        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn from_pairs_str_refs() {
+        let params = Params::from_pairs([("foo", "quux"), ("bar", "baz")]);
+        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+    }
+
+    #[test]
+    fn from_pairs_duplicate_keys_first_wins() {
+        let params = Params::from_pairs([("foo", "first"), ("foo", "second"), ("bar", "baz")]);
+        assert_eq!(params.get("foo"), Some(&"first".to_string()));
+        assert_eq!(params.get("bar"), Some(&"baz".to_string()));
+    }
+
+    #[test]
+    fn from_pairs_owned_strings() {
+        let params = Params::from_pairs(vec![(String::from("foo"), String::from("quux")), (String::from("bar"), String::from("baz"))]);
+        assert_eq!(params.len(), 2);
     }
 
     #[test]
@@ -216,7 +307,7 @@ mod tests {
 
     #[test]
     fn to_hash_map_owned_roundtrip() {
-        let mut expected = HashMap::new();
+        let mut expected: HashMap<String, String> = HashMap::new();
         expected.insert("foo".into(), "quux".into());
         expected.insert("bar".into(), "baz".into());
         let params = Params::from(expected.clone());
