@@ -25,7 +25,9 @@ fn main() -> Result<()> {
 
     let mut reader = entry.open().context("open entry")?;
     let mut content = String::new();
-    reader.read_to_string(&mut content).context("read entry body")?;
+    reader
+        .read_to_string(&mut content)
+        .context("read entry body")?;
 
     print!("{content}");
     if !content.ends_with('\n') {

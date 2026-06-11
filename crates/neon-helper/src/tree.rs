@@ -78,10 +78,26 @@ mod tests {
     #[test]
     fn builds_hierarchy() {
         let data = vec![
-            Item { id: 1, pid: 0, name: "a" },
-            Item { id: 2, pid: 1, name: "b" },
-            Item { id: 3, pid: 1, name: "c" },
-            Item { id: 4, pid: 2, name: "d" },
+            Item {
+                id: 1,
+                pid: 0,
+                name: "a",
+            },
+            Item {
+                id: 2,
+                pid: 1,
+                name: "b",
+            },
+            Item {
+                id: 3,
+                pid: 1,
+                name: "c",
+            },
+            Item {
+                id: 4,
+                pid: 2,
+                name: "d",
+            },
         ];
         let tree = new_tree(data, 0);
         dump_tree("builds_hierarchy", &tree);
@@ -99,14 +115,35 @@ mod tests {
 
     #[test]
     fn empty_when_no_nodes_under_root() {
-        let tree = new_tree(vec![Item { id: 1, pid: 99, name: "x" }], 0);
+        let tree = new_tree(
+            vec![Item {
+                id: 1,
+                pid: 99,
+                name: "x",
+            }],
+            0,
+        );
         dump_tree("empty_when_no_nodes_under_root", &tree);
         assert!(tree.is_empty());
     }
 
     #[test]
     fn multiple_top_level_nodes() {
-        let tree = new_tree(vec![Item { id: 1, pid: 0, name: "a" }, Item { id: 2, pid: 0, name: "b" }], 0);
+        let tree = new_tree(
+            vec![
+                Item {
+                    id: 1,
+                    pid: 0,
+                    name: "a",
+                },
+                Item {
+                    id: 2,
+                    pid: 0,
+                    name: "b",
+                },
+            ],
+            0,
+        );
         dump_tree("multiple_top_level_nodes", &tree);
         assert_eq!(tree.len(), 2);
         assert_eq!(tree[0].data.id, 1);

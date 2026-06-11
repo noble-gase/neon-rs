@@ -75,42 +75,84 @@ mod tests {
         let odt = OffsetDateTime::from_unix_timestamp(1562909696).unwrap();
 
         let system_zoned = odt.to_system_zoned().unwrap();
-        println!("{}", strtime::format(zoned::DATE_TIME, &system_zoned).unwrap());
+        println!(
+            "{}",
+            strtime::format(zoned::DATE_TIME, &system_zoned).unwrap()
+        );
 
         let zoned_in_tz = odt.to_zoned_in_tz("Asia/Shanghai").unwrap();
-        assert_eq!(strtime::format(zoned::DATE_TIME, &zoned_in_tz).unwrap(), "2019-07-12 13:34:56");
+        assert_eq!(
+            strtime::format(zoned::DATE_TIME, &zoned_in_tz).unwrap(),
+            "2019-07-12 13:34:56"
+        );
     }
 
     #[test]
     fn unix_timestamp_to_zoned() {
         // second
         let sec_system_zoned = UnixTime::Sec(1_562_909_696).to_system_zoned().unwrap();
-        println!("{}", strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap());
+        println!(
+            "{}",
+            strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap()
+        );
 
-        let sec_zoned_in_tz = UnixTime::Sec(1_562_909_696).to_zoned_in_tz("Asia/Shanghai").unwrap();
-        assert_eq!(strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(), "2019-07-12 13:34:56");
+        let sec_zoned_in_tz = UnixTime::Sec(1_562_909_696)
+            .to_zoned_in_tz("Asia/Shanghai")
+            .unwrap();
+        assert_eq!(
+            strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(),
+            "2019-07-12 13:34:56"
+        );
 
         // millisecond
-        let sec_system_zoned = UnixTime::Milli(1_562_909_696_000).to_system_zoned().unwrap();
-        println!("{}", strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap());
+        let sec_system_zoned = UnixTime::Milli(1_562_909_696_000)
+            .to_system_zoned()
+            .unwrap();
+        println!(
+            "{}",
+            strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap()
+        );
 
-        let sec_zoned_in_tz = UnixTime::Milli(1_562_909_696_000).to_zoned_in_tz("Asia/Shanghai").unwrap();
-        assert_eq!(strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(), "2019-07-12 13:34:56");
+        let sec_zoned_in_tz = UnixTime::Milli(1_562_909_696_000)
+            .to_zoned_in_tz("Asia/Shanghai")
+            .unwrap();
+        assert_eq!(
+            strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(),
+            "2019-07-12 13:34:56"
+        );
 
         // microsecond
-        let sec_system_zoned = UnixTime::Micro(1_562_909_696_000_000).to_system_zoned().unwrap();
-        println!("{}", strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap());
+        let sec_system_zoned = UnixTime::Micro(1_562_909_696_000_000)
+            .to_system_zoned()
+            .unwrap();
+        println!(
+            "{}",
+            strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap()
+        );
 
-        let sec_zoned_in_tz = UnixTime::Micro(1_562_909_696_000_000).to_zoned_in_tz("Asia/Shanghai").unwrap();
-        assert_eq!(strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(), "2019-07-12 13:34:56");
+        let sec_zoned_in_tz = UnixTime::Micro(1_562_909_696_000_000)
+            .to_zoned_in_tz("Asia/Shanghai")
+            .unwrap();
+        assert_eq!(
+            strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(),
+            "2019-07-12 13:34:56"
+        );
 
         // nanosecond
-        let sec_system_zoned = UnixTime::Nano(1_562_909_696_000_000_000).to_system_zoned().unwrap();
-        println!("{}", strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap());
+        let sec_system_zoned = UnixTime::Nano(1_562_909_696_000_000_000)
+            .to_system_zoned()
+            .unwrap();
+        println!(
+            "{}",
+            strtime::format(zoned::DATE_TIME, &sec_system_zoned).unwrap()
+        );
 
         let sec_zoned_in_tz = UnixTime::Nano(1_562_909_696_000_000_000)
             .to_zoned_in_tz("Asia/Shanghai")
             .unwrap();
-        assert_eq!(strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(), "2019-07-12 13:34:56");
+        assert_eq!(
+            strtime::format(zoned::DATE_TIME, &sec_zoned_in_tz).unwrap(),
+            "2019-07-12 13:34:56"
+        );
     }
 }

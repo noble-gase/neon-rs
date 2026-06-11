@@ -159,7 +159,11 @@ impl RemoteArchive {
         };
         let entries = parse_central_directory(&inner, &cd_data)?;
 
-        Ok(Self { inner, size, entries })
+        Ok(Self {
+            inner,
+            size,
+            entries,
+        })
     }
 
     pub fn url(&self) -> &str {
@@ -171,9 +175,10 @@ impl ArchiveEntry {
     /// 打开条目正文，返回可读流（Store 或 Deflate）
     pub fn open(&self) -> Result<EntryReader> {
         // 读取 Local File Header（固定 30 字节 + 预留文件名/extra）
-        let header = self
-            .inner
-            .fetch_range(self.local_header_offset, self.local_header_offset + 30 + 256)?;
+        let header = self.inner.fetch_range(
+            self.local_header_offset,
+            self.local_header_offset + 30 + 256,
+        )?;
         ensure!(header.len() >= 30, "local file header too short");
 
         let name_len = u16::from_le_bytes([header[26], header[27]]) as u64;
@@ -216,7 +221,11 @@ fn fetch_content_length(client: &Client, url: &str) -> Result<u64> {
         .header(RANGE, "bytes=0-0")
         .send()
         .context("probe Content-Range")?;
-    ensure!(probe.status().is_success(), "probe range failed: {}", probe.status());
+    ensure!(
+        probe.status().is_success(),
+        "probe range failed: {}",
+        probe.status()
+    );
     if let Some(total) = probe
         .headers()
         .get(CONTENT_RANGE)
@@ -252,21 +261,28 @@ fn locate_central_directory(inner: &ArchiveInner, tail: &[u8], size: u64) -> Res
 
     // `0xFFFFFFFF` 表示需走 ZIP64 EOCD
     if cd_size == u64::from(ZIP64_SENTINEL) || cd_offset == u64::from(ZIP64_SENTINEL) {
-        let loc_idx = find_signature_tail(tail, &ZIP64_LOCATOR_SIGNATURE).context("ZIP64 locator not found")?;
+        let loc_idx = find_signature_tail(tail, &ZIP64_LOCATOR_SIGNATURE)
+            .context("ZIP64 locator not found")?;
         let loc = &tail[loc_idx..];
         ensure!(loc.len() >= 16, "ZIP64 locator too short");
 
         // Locator +8: ZIP64 EOCD 在文件中的偏移
         let zip64_eocd_offset = u64::from_le_bytes(loc[8..16].try_into()?);
         let zip64_eocd = inner.fetch_range(zip64_eocd_offset, zip64_eocd_offset + 55)?;
-        ensure!(zip64_eocd.starts_with(&ZIP64_EOCD_SIGNATURE), "invalid ZIP64 EOCD signature");
+        ensure!(
+            zip64_eocd.starts_with(&ZIP64_EOCD_SIGNATURE),
+            "invalid ZIP64 EOCD signature"
+        );
         ensure!(zip64_eocd.len() >= 56, "ZIP64 EOCD too short");
         // ZIP64 EOCD +40 / +48: 真实的 cd_size、cd_offset
         cd_size = u64::from_le_bytes(zip64_eocd[40..48].try_into()?);
         cd_offset = u64::from_le_bytes(zip64_eocd[48..56].try_into()?);
     }
 
-    ensure!(cd_offset + cd_size <= size, "central directory out of bounds");
+    ensure!(
+        cd_offset + cd_size <= size,
+        "central directory out of bounds"
+    );
     Ok((cd_size, cd_offset))
 }
 
@@ -292,11 +308,15 @@ fn parse_central_directory(inner: &Arc<ArchiveInner>, data: &[u8]) -> Result<Vec
         let extra_len = usize::from(u16::from_le_bytes(data[i + 30..i + 32].try_into()?));
         let comment_len = usize::from(u16::from_le_bytes(data[i + 32..i + 34].try_into()?));
         // +42 Local File Header 偏移
-        let mut local_header_offset = u64::from(u32::from_le_bytes(data[i + 42..i + 46].try_into()?));
+        let mut local_header_offset =
+            u64::from(u32::from_le_bytes(data[i + 42..i + 46].try_into()?));
 
         let name_end = i + 46 + name_len;
         let extra_end = name_end + extra_len;
-        ensure!(extra_end <= data.len(), "central directory entry out of range");
+        ensure!(
+            extra_end <= data.len(),
+            "central directory entry out of range"
+        );
 
         let name = std::str::from_utf8(&data[i + 46..name_end])
             .context("invalid UTF-8 file name in central directory")?
@@ -308,7 +328,12 @@ fn parse_central_directory(inner: &Arc<ArchiveInner>, data: &[u8]) -> Result<Vec
             || uncompressed_size == u64::from(ZIP64_SENTINEL)
             || local_header_offset == u64::from(ZIP64_SENTINEL)
         {
-            parse_zip64_extra(extra, &mut uncompressed_size, &mut compressed_size, &mut local_header_offset)?;
+            parse_zip64_extra(
+                extra,
+                &mut uncompressed_size,
+                &mut compressed_size,
+                &mut local_header_offset,
+            )?;
         }
 
         // 固定头 46 字节 + 文件名 + extra + 注释
@@ -330,7 +355,12 @@ fn parse_central_directory(inner: &Arc<ArchiveInner>, data: &[u8]) -> Result<Vec
 ///
 /// 数据区按顺序存放（仅当对应 CD 字段为 `0xFFFFFFFF` 时才出现）：
 /// 未压缩大小 → 压缩大小 → Local Header 偏移
-fn parse_zip64_extra(extra: &[u8], uncompressed_size: &mut u64, compressed_size: &mut u64, local_header_offset: &mut u64) -> Result<()> {
+fn parse_zip64_extra(
+    extra: &[u8],
+    uncompressed_size: &mut u64,
+    compressed_size: &mut u64,
+    local_header_offset: &mut u64,
+) -> Result<()> {
     let mut j = 0usize;
     while j + 4 <= extra.len() {
         // [HeaderID: u16][DataSize: u16][Data...]
@@ -342,7 +372,10 @@ fn parse_zip64_extra(extra: &[u8], uncompressed_size: &mut u64, compressed_size:
         if header_id == 0x0001 {
             let mut k = j;
             if *uncompressed_size == u64::from(ZIP64_SENTINEL) {
-                ensure!(k + 8 <= extra.len(), "ZIP64 extra missing uncompressed size");
+                ensure!(
+                    k + 8 <= extra.len(),
+                    "ZIP64 extra missing uncompressed size"
+                );
                 *uncompressed_size = u64::from_le_bytes(extra[k..k + 8].try_into()?);
                 k += 8;
             }
@@ -352,7 +385,10 @@ fn parse_zip64_extra(extra: &[u8], uncompressed_size: &mut u64, compressed_size:
                 k += 8;
             }
             if *local_header_offset == u64::from(ZIP64_SENTINEL) {
-                ensure!(k + 8 <= extra.len(), "ZIP64 extra missing local header offset");
+                ensure!(
+                    k + 8 <= extra.len(),
+                    "ZIP64 extra missing local header offset"
+                );
                 *local_header_offset = u64::from_le_bytes(extra[k..k + 8].try_into()?);
             }
         }
@@ -363,7 +399,9 @@ fn parse_zip64_extra(extra: &[u8], uncompressed_size: &mut u64, compressed_size:
 
 /// 在 `haystack` 中自后向前查找 `signature` 的首次出现位置
 fn find_signature_tail(haystack: &[u8], signature: &[u8]) -> Option<usize> {
-    haystack.windows(signature.len()).rposition(|window| window == signature)
+    haystack
+        .windows(signature.len())
+        .rposition(|window| window == signature)
 }
 
 impl ArchiveInner {
@@ -375,7 +413,11 @@ impl ArchiveInner {
             .header(RANGE, format!("bytes={start}-{end}"))
             .send()
             .with_context(|| format!("range request bytes={start}-{end}"))?;
-        ensure!(response.status().is_success(), "range request failed: {}", response.status());
+        ensure!(
+            response.status().is_success(),
+            "range request failed: {}",
+            response.status()
+        );
         Ok(response.bytes().context("read range body")?.to_vec())
     }
 
@@ -387,7 +429,11 @@ impl ArchiveInner {
             .header(RANGE, format!("bytes={start}-{end}"))
             .send()
             .with_context(|| format!("range stream bytes={start}-{end}"))?;
-        ensure!(response.status().is_success(), "range stream failed: {}", response.status());
+        ensure!(
+            response.status().is_success(),
+            "range stream failed: {}",
+            response.status()
+        );
         Ok(Box::new(response))
     }
 }

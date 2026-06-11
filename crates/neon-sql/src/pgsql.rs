@@ -2,7 +2,10 @@
 
 use std::time::Instant;
 
-use sea_query::{DeleteStatement, Expr, InsertStatement, PostgresQueryBuilder, SelectStatement, UpdateStatement, inject_parameters};
+use sea_query::{
+    DeleteStatement, Expr, InsertStatement, PostgresQueryBuilder, SelectStatement, UpdateStatement,
+    inject_parameters,
+};
 use sea_query_sqlx::SqlxBinder;
 use sqlx::{AssertSqlSafe, Executor, FromRow, Postgres, postgres::PgRow};
 
@@ -35,7 +38,9 @@ where
     let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
 
     let start = Instant::now();
-    let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values).fetch_one(db).await;
+    let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values)
+        .fetch_one(db)
+        .await;
     let cost = start.elapsed();
 
     trace_insert_result(log_sql, cost, ret, |v| v)
@@ -66,7 +71,9 @@ where
     let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
 
     let start = Instant::now();
-    let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values).fetch_all(db).await;
+    let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values)
+        .fetch_all(db)
+        .await;
     let cost = start.elapsed();
 
     trace_query_result(log_sql, cost, ret)
@@ -94,7 +101,9 @@ where
     let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
 
     let start = Instant::now();
-    let ret = sqlx::query_with(AssertSqlSafe(sql), values).execute(db).await;
+    let ret = sqlx::query_with(AssertSqlSafe(sql), values)
+        .execute(db)
+        .await;
     let cost = start.elapsed();
 
     trace_execute_result(log_sql, cost, ret, |v| v.rows_affected())
@@ -121,7 +130,9 @@ where
     let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
 
     let start = Instant::now();
-    let ret = sqlx::query_with(AssertSqlSafe(sql), values).execute(db).await;
+    let ret = sqlx::query_with(AssertSqlSafe(sql), values)
+        .execute(db)
+        .await;
     let cost = start.elapsed();
 
     trace_execute_result(log_sql, cost, ret, |v| v.rows_affected())
@@ -153,7 +164,9 @@ where
     let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
 
     let start = Instant::now();
-    let ret: Result<i64, sqlx::Error> = sqlx::query_scalar_with(AssertSqlSafe(sql), values).fetch_one(db).await;
+    let ret: Result<i64, sqlx::Error> = sqlx::query_scalar_with(AssertSqlSafe(sql), values)
+        .fetch_one(db)
+        .await;
     let cost = start.elapsed();
 
     trace_query_result(log_sql, cost, ret)
@@ -214,7 +227,9 @@ where
     let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
 
     let start = Instant::now();
-    let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values).fetch_all(db).await;
+    let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values)
+        .fetch_all(db)
+        .await;
     let cost = start.elapsed();
 
     trace_query_result(log_sql, cost, ret)
@@ -234,7 +249,12 @@ where
 ///
 /// let ret = pgsql::paginate::<model::Demo>(&pool, stmt, 1, 10).await;
 /// ```
-pub async fn paginate<'e, E, T>(db: E, mut stmt: SelectStatement, mut page: i32, mut size: i32) -> anyhow::Result<(Vec<T>, i64)>
+pub async fn paginate<'e, E, T>(
+    db: E,
+    mut stmt: SelectStatement,
+    mut page: i32,
+    mut size: i32,
+) -> anyhow::Result<(Vec<T>, i64)>
 where
     E: Executor<'e, Database = Postgres> + Copy,
     T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
@@ -250,9 +270,10 @@ where
     let log_count_sql = inject_parameters(&count_sql, &count_values.0.0, &PostgresQueryBuilder);
 
     let count_start = Instant::now();
-    let ret: Result<i64, sqlx::Error> = sqlx::query_scalar_with(AssertSqlSafe(count_sql), count_values)
-        .fetch_one(db)
-        .await;
+    let ret: Result<i64, sqlx::Error> =
+        sqlx::query_scalar_with(AssertSqlSafe(count_sql), count_values)
+            .fetch_one(db)
+            .await;
     let count_cost = count_start.elapsed();
 
     let total = trace_query_result(log_count_sql, count_cost, ret)?;

@@ -12,7 +12,8 @@ pub fn expand_sqlx_model(input: TokenStream) -> TokenStream {
     let fields = match &input.data {
         syn::Data::Struct(s) => &s.fields,
         _ => {
-            return syn::Error::new_spanned(&input.ident, "Model can only be derived for structs").to_compile_error();
+            return syn::Error::new_spanned(&input.ident, "Model can only be derived for structs")
+                .to_compile_error();
         }
     };
 

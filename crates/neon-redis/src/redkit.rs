@@ -17,7 +17,12 @@ end
 ///
 /// 值以 JSON 字符串存储并发 miss 时 `loader` 可能被多次调用
 /// 回源成功但写缓存失败时仍返回 loader 结果（失败仅记 error 日志）
-pub async fn get_or_set<T, F, Fut>(pool: AsyncPool, key: impl AsRef<str>, loader: F, ttl: Option<Duration>) -> anyhow::Result<Option<T>>
+pub async fn get_or_set<T, F, Fut>(
+    pool: AsyncPool,
+    key: impl AsRef<str>,
+    loader: F,
+    ttl: Option<Duration>,
+) -> anyhow::Result<Option<T>>
 where
     T: Serialize + DeserializeOwned + Send + 'static,
     F: FnOnce() -> Fut,
@@ -36,7 +41,12 @@ where
     }
 }
 
-async fn get_or_set_inner<C, T, F, Fut>(conn: &mut C, key: &str, loader: F, ttl: Option<Duration>) -> anyhow::Result<Option<T>>
+async fn get_or_set_inner<C, T, F, Fut>(
+    conn: &mut C,
+    key: &str,
+    loader: F,
+    ttl: Option<Duration>,
+) -> anyhow::Result<Option<T>>
 where
     C: AsyncCommands,
     T: Serialize + DeserializeOwned + Send + 'static,
@@ -71,7 +81,11 @@ where
 /// 指定 `ttl` 时，若 hash key 尚无 TTL 会通过 Lua 脚本补设过期时间
 /// 回源成功但写缓存失败时仍返回 loader 结果（失败仅记 error 日志）
 pub async fn hget_or_set<T, F, Fut>(
-    pool: AsyncPool, key: impl AsRef<str>, field: impl AsRef<str>, loader: F, ttl: Option<Duration>,
+    pool: AsyncPool,
+    key: impl AsRef<str>,
+    field: impl AsRef<str>,
+    loader: F,
+    ttl: Option<Duration>,
 ) -> anyhow::Result<Option<T>>
 where
     T: Serialize + DeserializeOwned + Send + 'static,
@@ -92,7 +106,11 @@ where
 }
 
 async fn hget_or_set_inner<C, T, F, Fut>(
-    conn: &mut C, key: &str, field: &str, loader: F, ttl: Option<Duration>,
+    conn: &mut C,
+    key: &str,
+    field: &str,
+    loader: F,
+    ttl: Option<Duration>,
 ) -> anyhow::Result<Option<T>>
 where
     C: AsyncCommands,
@@ -196,7 +214,10 @@ where
     }
 }
 
-async fn mget_str_map_inner<C, K>(conn: &mut C, keys: &[K]) -> anyhow::Result<HashMap<String, String>>
+async fn mget_str_map_inner<C, K>(
+    conn: &mut C,
+    keys: &[K],
+) -> anyhow::Result<HashMap<String, String>>
 where
     C: AsyncCommands,
     K: AsRef<str> + Sync,
@@ -247,7 +268,11 @@ where
 }
 
 /// `HMGET` 并将存在的 field 反序列化为 `HashMap<field, T>`
-pub async fn hmget_map<K, T>(pool: AsyncPool, key: K, fields: &[K]) -> anyhow::Result<HashMap<String, T>>
+pub async fn hmget_map<K, T>(
+    pool: AsyncPool,
+    key: K,
+    fields: &[K],
+) -> anyhow::Result<HashMap<String, T>>
 where
     K: AsRef<str> + Sync,
     T: Serialize + DeserializeOwned,
@@ -265,7 +290,11 @@ where
     }
 }
 
-async fn hmget_map_inner<C, K, T>(conn: &mut C, key: &str, fields: &[K]) -> anyhow::Result<HashMap<String, T>>
+async fn hmget_map_inner<C, K, T>(
+    conn: &mut C,
+    key: &str,
+    fields: &[K],
+) -> anyhow::Result<HashMap<String, T>>
 where
     C: AsyncCommands,
     K: AsRef<str> + Sync,
@@ -284,7 +313,11 @@ where
 }
 
 /// `HMGET` 并将存在的 field 收集为 `HashMap<field, String>`
-pub async fn hmget_str_map<K>(pool: AsyncPool, key: K, fields: &[K]) -> anyhow::Result<HashMap<String, String>>
+pub async fn hmget_str_map<K>(
+    pool: AsyncPool,
+    key: K,
+    fields: &[K],
+) -> anyhow::Result<HashMap<String, String>>
 where
     K: AsRef<str> + Sync,
 {
@@ -301,7 +334,11 @@ where
     }
 }
 
-async fn hmget_str_map_inner<C, K>(conn: &mut C, key: &str, fields: &[K]) -> anyhow::Result<HashMap<String, String>>
+async fn hmget_str_map_inner<C, K>(
+    conn: &mut C,
+    key: &str,
+    fields: &[K],
+) -> anyhow::Result<HashMap<String, String>>
 where
     C: AsyncCommands,
     K: AsRef<str> + Sync,
@@ -342,7 +379,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_get_or_set() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let ret = get_or_set(
             AsyncPool::Single(pool.clone()),
@@ -369,7 +408,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hget_or_set() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let ret = hget_or_set(
             AsyncPool::Single(pool.clone()),
@@ -397,7 +438,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_mget_map() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -410,18 +453,28 @@ mod tests {
             ])
             .await;
 
-        let ret: HashMap<String, Demo> = mget_map(AsyncPool::Single(pool.clone()), &["foo", "bar", "hello", "none"])
-            .await
-            .unwrap();
+        let ret: HashMap<String, Demo> = mget_map(
+            AsyncPool::Single(pool.clone()),
+            &["foo", "bar", "hello", "none"],
+        )
+        .await
+        .unwrap();
         println!(">> {:#?}", ret);
 
-        let _: RedisResult<()> = pool.get().await.unwrap().del(&["foo", "bar", "hello"]).await;
+        let _: RedisResult<()> = pool
+            .get()
+            .await
+            .unwrap()
+            .del(&["foo", "bar", "hello"])
+            .await;
     }
 
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_mget_str_map() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -434,18 +487,28 @@ mod tests {
             ])
             .await;
 
-        let ret: HashMap<String, String> = mget_str_map(AsyncPool::Single(pool.clone()), &["foo", "bar", "hello", "none"])
-            .await
-            .unwrap();
+        let ret: HashMap<String, String> = mget_str_map(
+            AsyncPool::Single(pool.clone()),
+            &["foo", "bar", "hello", "none"],
+        )
+        .await
+        .unwrap();
         println!(">> {:#?}", ret);
 
-        let _: RedisResult<()> = pool.get().await.unwrap().del(&["foo", "bar", "hello"]).await;
+        let _: RedisResult<()> = pool
+            .get()
+            .await
+            .unwrap()
+            .del(&["foo", "bar", "hello"])
+            .await;
     }
 
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hgetall() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -461,7 +524,9 @@ mod tests {
             )
             .await;
 
-        let ret: HashMap<String, Demo> = hgetall(AsyncPool::Single(pool.clone()), "test").await.unwrap();
+        let ret: HashMap<String, Demo> = hgetall(AsyncPool::Single(pool.clone()), "test")
+            .await
+            .unwrap();
         println!(">> {:#?}", ret);
 
         let _: RedisResult<()> = pool.get().await.unwrap().del("test").await;
@@ -470,7 +535,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hmget_map() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -486,9 +553,13 @@ mod tests {
             )
             .await;
 
-        let ret: HashMap<String, Demo> = hmget_map(AsyncPool::Single(pool.clone()), "test", &["foo", "bar", "hello", "none"])
-            .await
-            .unwrap();
+        let ret: HashMap<String, Demo> = hmget_map(
+            AsyncPool::Single(pool.clone()),
+            "test",
+            &["foo", "bar", "hello", "none"],
+        )
+        .await
+        .unwrap();
         println!(">> {:#?}", ret);
 
         let _: RedisResult<()> = pool.get().await.unwrap().del("test").await;
@@ -497,7 +568,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_hmget_str_map() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -513,9 +586,13 @@ mod tests {
             )
             .await;
 
-        let ret: HashMap<String, String> = hmget_str_map(AsyncPool::Single(pool.clone()), "test", &["foo", "bar", "hello", "none"])
-            .await
-            .unwrap();
+        let ret: HashMap<String, String> = hmget_str_map(
+            AsyncPool::Single(pool.clone()),
+            "test",
+            &["foo", "bar", "hello", "none"],
+        )
+        .await
+        .unwrap();
         println!(">> {:#?}", ret);
 
         let _: RedisResult<()> = pool.get().await.unwrap().del("test").await;
@@ -525,7 +602,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_get_or_set_cluster() {
-        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let ret = get_or_set(
             AsyncPool::Cluster(pool.clone()),
@@ -542,14 +621,21 @@ mod tests {
         .unwrap();
         assert_eq!(ret.as_ref().map(|d| d.name.as_str()), Some("cluster"));
 
-        let _: RedisResult<()> = pool.get().await.unwrap().del("redkit:cluster:get_or_set").await;
+        let _: RedisResult<()> = pool
+            .get()
+            .await
+            .unwrap()
+            .del("redkit:cluster:get_or_set")
+            .await;
     }
 
     #[cfg(feature = "cluster")]
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_hget_or_set_cluster() {
-        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let ret = hget_or_set(
             AsyncPool::Cluster(pool.clone()),
@@ -574,7 +660,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_mget_map_cluster() {
-        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -589,7 +677,12 @@ mod tests {
 
         let ret: HashMap<String, Demo> = mget_map(
             AsyncPool::Cluster(pool.clone()),
-            &["{redkit}:foo", "{redkit}:bar", "{redkit}:hello", "{redkit}:none"],
+            &[
+                "{redkit}:foo",
+                "{redkit}:bar",
+                "{redkit}:hello",
+                "{redkit}:none",
+            ],
         )
         .await
         .unwrap();
@@ -607,7 +700,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_hgetall_cluster() {
-        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         let _: RedisResult<()> = pool
             .get()
@@ -615,15 +710,24 @@ mod tests {
             .unwrap()
             .hset_multiple(
                 "redkit:cluster:hgetall",
-                &[("foo", json!({"id":1,"name":"foo"}).to_string()), ("bar", json!({"id":2,"name":"bar"}).to_string())],
+                &[
+                    ("foo", json!({"id":1,"name":"foo"}).to_string()),
+                    ("bar", json!({"id":2,"name":"bar"}).to_string()),
+                ],
             )
             .await;
 
-        let ret: HashMap<String, Demo> = hgetall(AsyncPool::Cluster(pool.clone()), "redkit:cluster:hgetall")
-            .await
-            .unwrap();
+        let ret: HashMap<String, Demo> =
+            hgetall(AsyncPool::Cluster(pool.clone()), "redkit:cluster:hgetall")
+                .await
+                .unwrap();
         assert_eq!(ret.len(), 2);
 
-        let _: RedisResult<()> = pool.get().await.unwrap().del("redkit:cluster:hgetall").await;
+        let _: RedisResult<()> = pool
+            .get()
+            .await
+            .unwrap()
+            .del("redkit:cluster:hgetall")
+            .await;
     }
 }

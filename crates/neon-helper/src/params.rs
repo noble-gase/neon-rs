@@ -22,13 +22,6 @@ pub enum EmptyMode {
     OnlyKey,
 }
 
-/// 签名 encode 选项
-#[derive(Debug, Default, Clone)]
-pub struct EncodeOptions {
-    pub empty_mode: EmptyMode,
-    pub ignore_keys: Vec<String>,
-}
-
 impl Params {
     pub fn new() -> Self {
         Self(BTreeMap::new())
@@ -36,24 +29,36 @@ impl Params {
 
     /// 按指定符号与分隔符编码签名串（按 key ASCII 升序）
     ///
-    /// `opt` 为 `None` 时使用 [`EncodeOptions::default()`]。
-    pub fn encode(&self, sym: impl AsRef<str>, sep: impl AsRef<str>, opt: Option<EncodeOptions>) -> String {
+    /// `empty_mode` 为 `None` 时使用 [`EmptyMode::Default`]
+    pub fn encode(
+        &self,
+        sym: impl AsRef<str>,
+        sep: impl AsRef<str>,
+        empty_mode: Option<EmptyMode>,
+        ignore_keys: Option<Vec<String>>,
+    ) -> String {
         if self.0.is_empty() {
             return String::new();
         }
 
         let sym = sym.as_ref();
         let sep = sep.as_ref();
-        let opts = opt.unwrap_or_default();
+        let empty_mode = empty_mode.unwrap_or_default();
+        let ignore_keys = ignore_keys.unwrap_or_default();
 
         let mut buf = String::new();
-        buf.reserve(self.0.iter().map(|(k, v)| k.len() + v.len() + sym.len() + sep.len()).sum());
+        buf.reserve(
+            self.0
+                .iter()
+                .map(|(k, v)| k.len() + v.len() + sym.len() + sep.len())
+                .sum(),
+        );
 
         for (k, v) in self.0.iter() {
-            if opts.ignore_keys.contains(k) {
+            if ignore_keys.contains(k) {
                 continue;
             }
-            if v.is_empty() && opts.empty_mode == EmptyMode::Ignore {
+            if v.is_empty() && empty_mode == EmptyMode::Ignore {
                 continue;
             }
 
@@ -67,7 +72,7 @@ impl Params {
                 continue;
             }
             // 保留符号
-            if opts.empty_mode != EmptyMode::OnlyKey {
+            if empty_mode != EmptyMode::OnlyKey {
                 buf.push_str(sym);
             }
         }
@@ -77,7 +82,7 @@ impl Params {
 
     /// 从 `(key, value)` 迭代器构造 Params（key 会按 ASCII 字典序排序）
     ///
-    /// `K`、`V` 需实现 [`AsRef<str>`]（如 [`String`]、`&str`）。重复 key 时保留**首次**出现的 value。
+    /// 重复 key 时保留**首次**出现的 value。
     pub fn from_pairs<I, K, V>(iter: I) -> Self
     where
         I: IntoIterator<Item = (K, V)>,
@@ -86,14 +91,14 @@ impl Params {
     {
         let mut inner = BTreeMap::new();
         for (k, v) in iter {
-            inner.entry(k.as_ref().to_owned()).or_insert_with(|| v.as_ref().to_owned());
+            inner
+                .entry(k.as_ref().to_owned())
+                .or_insert_with(|| v.as_ref().to_owned());
         }
         Self(inner)
     }
 
     /// 从 `HashMap` 构造 Params（key 会按 ASCII 字典序排序）
-    ///
-    /// `K`、`V` 需实现 [`AsRef<str>`]（如 [`String`]、`&str`）。
     pub fn from_hash_map<K, V>(map: &HashMap<K, V>) -> Self
     where
         K: Eq + Hash + AsRef<str>,
@@ -118,7 +123,9 @@ impl Params {
         let parsed = form_urlencoded::parse(query.as_ref().as_bytes());
         let mut inner = BTreeMap::new();
         for (k, v) in parsed {
-            inner.entry(k.into_owned()).or_insert_with(|| v.into_owned());
+            inner
+                .entry(k.into_owned())
+                .or_insert_with(|| v.into_owned());
         }
         Self(inner)
     }
@@ -172,12 +179,12 @@ mod tests {
         let mut params = Params::new();
         params.insert("foo".into(), "quux".into());
         params.insert("bar".into(), "baz".into());
-        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
     }
 
     #[test]
     fn encode_empty() {
-        assert_eq!(Params::new().encode("=", "&", None), "");
+        assert_eq!(Params::new().encode("=", "&", None, None), "");
         assert_eq!(Params::new().url_encode(), "");
     }
 
@@ -186,27 +193,13 @@ mod tests {
         let mut params = Params::new();
         params.insert("foo".into(), "".into());
         params.insert("bar".into(), "baz".into());
-        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=");
+        assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=");
         assert_eq!(
-            params.encode(
-                "=",
-                "&",
-                Some(EncodeOptions {
-                    empty_mode: EmptyMode::Ignore,
-                    ..Default::default()
-                })
-            ),
+            params.encode("=", "&", Some(EmptyMode::Ignore), None),
             "bar=baz"
         );
         assert_eq!(
-            params.encode(
-                "=",
-                "&",
-                Some(EncodeOptions {
-                    empty_mode: EmptyMode::OnlyKey,
-                    ..Default::default()
-                })
-            ),
+            params.encode("=", "&", Some(EmptyMode::OnlyKey), None),
             "bar=baz&foo"
         );
     }
@@ -217,11 +210,10 @@ mod tests {
         params.insert("foo".into(), "quux".into());
         params.insert("bar".into(), "baz".into());
         params.insert("sign".into(), "xx".into());
-        let opts = EncodeOptions {
-            ignore_keys: vec!["sign".into()],
-            ..Default::default()
-        };
-        assert_eq!(params.encode("=", "&", Some(opts)), "bar=baz&foo=quux");
+        assert_eq!(
+            params.encode("=", "&", None, Some(vec!["sign".to_string()])),
+            "bar=baz&foo=quux"
+        );
     }
 
     #[test]
@@ -229,11 +221,11 @@ mod tests {
         let mut params = Params::new();
         params.insert("foo".into(), "quux".into());
         params.insert("sign".into(), "xx".into());
-        let opts = EncodeOptions {
-            ignore_keys: vec!["sign".into(), String::from("nonce")],
-            ..Default::default()
-        };
-        assert_eq!(params.encode("=", "&", Some(opts)), "foo=quux");
+        let nonce = String::from("nonce");
+        assert_eq!(
+            params.encode("=", "&", None, Some(vec!["sign".into(), nonce])),
+            "foo=quux"
+        );
     }
 
     #[test]
@@ -242,7 +234,7 @@ mod tests {
         map.insert("foo".into(), "quux".into());
         map.insert("bar".into(), "baz".into());
         let params = Params::from_hash_map(&map);
-        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
         assert_eq!(map.len(), 2);
     }
 
@@ -252,7 +244,7 @@ mod tests {
         map.insert("foo".into(), "quux".into());
         map.insert("bar".into(), "baz".into());
         let params = Params::from(map);
-        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
     }
 
     #[test]
@@ -261,7 +253,7 @@ mod tests {
         map.insert("foo", "quux");
         map.insert("bar", "baz");
         let params = Params::from_hash_map(&map);
-        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
         let params = Params::from(map);
         assert_eq!(params.get("foo"), Some(&"quux".to_string()));
     }
@@ -272,13 +264,13 @@ mod tests {
         map.insert("foo".into(), "quux");
         map.insert("bar".into(), "baz");
         let params = Params::from_hash_map(&map);
-        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
     }
 
     #[test]
     fn from_pairs_str_refs() {
         let params = Params::from_pairs([("foo", "quux"), ("bar", "baz")]);
-        assert_eq!(params.encode("=", "&", None), "bar=baz&foo=quux");
+        assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
     }
 
     #[test]
@@ -290,7 +282,10 @@ mod tests {
 
     #[test]
     fn from_pairs_owned_strings() {
-        let params = Params::from_pairs(vec![(String::from("foo"), String::from("quux")), (String::from("bar"), String::from("baz"))]);
+        let params = Params::from_pairs(vec![
+            (String::from("foo"), String::from("quux")),
+            (String::from("bar"), String::from("baz")),
+        ]);
         assert_eq!(params.len(), 2);
     }
 

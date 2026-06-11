@@ -1,9 +1,10 @@
-//! 通用基础工具：随机串、时区转换、坐标计算、树形结构构建、远程 ZIP 读取 等
+//! 通用基础工具：随机串、时区转换、URLEncode、坐标计算、树形结构构建、远程 ZIP 读取 等
 
 pub mod coord;
 pub mod httpzip;
 pub mod params;
 pub mod tree;
+pub mod urlencoded;
 pub mod zoned;
 
 /// 通用 JSON 对象类型

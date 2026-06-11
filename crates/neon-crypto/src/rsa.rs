@@ -3,8 +3,14 @@ use std::fmt;
 use anyhow::anyhow;
 use digest::Digest;
 use md5::Md5;
-use rsa::pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey, LineEnding as Pkcs1LineEnding};
-use rsa::pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding as Pkcs8LineEnding};
+use rsa::pkcs1::{
+    DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey,
+    LineEnding as Pkcs1LineEnding,
+};
+use rsa::pkcs8::{
+    DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey,
+    LineEnding as Pkcs8LineEnding,
+};
 use rsa::signature::{RandomizedSigner, SignatureEncoding, Verifier};
 use rsa::traits::PublicKeyParts;
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
@@ -41,7 +47,10 @@ pub fn generate_pkcs1_keypair(bits: usize) -> anyhow::Result<KeyPair> {
         .to_pkcs1_pem(Pkcs1LineEnding::LF)
         .map(|s| s.to_string())
         .map_err(|e| anyhow!("encode PKCS#1 public key: {e}"))?;
-    Ok(KeyPair { private_pem, public_pem })
+    Ok(KeyPair {
+        private_pem,
+        public_pem,
+    })
 }
 
 /// 生成 PKCS#8 格式的 RSA 密钥对
@@ -55,7 +64,10 @@ pub fn generate_pkcs8_keypair(bits: usize) -> anyhow::Result<KeyPair> {
         .to_public_key_pem(Pkcs8LineEnding::LF)
         .map(|s| s.to_string())
         .map_err(|e| anyhow!("encode PKIX public key: {e}"))?;
-    Ok(KeyPair { private_pem, public_pem })
+    Ok(KeyPair {
+        private_pem,
+        public_pem,
+    })
 }
 
 fn generate_rsa_key(bits: usize) -> anyhow::Result<RsaPrivateKey> {
@@ -209,7 +221,10 @@ impl PrivateKey {
     /// PKCS#1 v1.5 签名；`D` 为摘要算法
     pub fn sign<D>(&self, data: impl AsRef<[u8]>) -> anyhow::Result<Vec<u8>>
     where
-        D: Digest + digest::FixedOutputReset + digest::HashMarker + digest::const_oid::AssociatedOid,
+        D: Digest
+            + digest::FixedOutputReset
+            + digest::HashMarker
+            + digest::const_oid::AssociatedOid,
     {
         use rsa::pkcs1v15::SigningKey;
         let mut rng = rand::rng();
@@ -236,15 +251,21 @@ impl PrivateKey {
     }
 
     /// PSS 签名，指定 salt 长度
-    pub fn sign_pss_with_salt_len<D>(&self, data: impl AsRef<[u8]>, salt_len: usize) -> anyhow::Result<Vec<u8>>
+    pub fn sign_pss_with_salt_len<D>(
+        &self,
+        data: impl AsRef<[u8]>,
+        salt_len: usize,
+    ) -> anyhow::Result<Vec<u8>>
     where
         D: Digest + digest::FixedOutputReset,
     {
         use rsa::pss::SigningKey;
         let mut rng = rand::rng();
-        Ok(SigningKey::<D>::new_with_salt_len(self.key.clone(), salt_len)
-            .sign_with_rng(&mut rng, data.as_ref())
-            .to_vec())
+        Ok(
+            SigningKey::<D>::new_with_salt_len(self.key.clone(), salt_len)
+                .sign_with_rng(&mut rng, data.as_ref())
+                .to_vec(),
+        )
     }
 
     /// 密钥字节长度
@@ -280,7 +301,8 @@ impl PublicKey {
                 .map(|key| PublicKey { key })
                 .map_err(|e| anyhow!("PKIX: {e}")),
             CERTIFICATE => {
-                let cert = Certificate::from_der(pem.contents()).map_err(|e| anyhow!("X.509: {e}"))?;
+                let cert =
+                    Certificate::from_der(pem.contents()).map_err(|e| anyhow!("X.509: {e}"))?;
                 public_key_from_spki(cert.tbs_certificate().subject_public_key_info().clone())
             }
             other => Err(anyhow!("unsupported PEM type: {other}")),
@@ -300,7 +322,9 @@ impl PublicKey {
                 .to_public_key_pem(Pkcs8LineEnding::LF)
                 .map(|s| s.to_string())
                 .map_err(|e| anyhow!("encode PKIX public key: {e}")),
-            PublicPemType::Certificate => Err(anyhow!("cannot encode public key as X.509 certificate")),
+            PublicPemType::Certificate => {
+                Err(anyhow!("cannot encode public key as X.509 certificate"))
+            }
         }
     }
 
@@ -324,9 +348,16 @@ impl PublicKey {
     }
 
     /// PKCS#1 v1.5 验签；`D` 为摘要算法
-    pub fn verify<D>(&self, data: impl AsRef<[u8]>, signature: impl AsRef<[u8]>) -> anyhow::Result<()>
+    pub fn verify<D>(
+        &self,
+        data: impl AsRef<[u8]>,
+        signature: impl AsRef<[u8]>,
+    ) -> anyhow::Result<()>
     where
-        D: Digest + digest::FixedOutputReset + digest::HashMarker + digest::const_oid::AssociatedOid,
+        D: Digest
+            + digest::FixedOutputReset
+            + digest::HashMarker
+            + digest::const_oid::AssociatedOid,
     {
         use rsa::pkcs1v15::{Signature, VerifyingKey};
         let sig = Signature::try_from(signature.as_ref()).map_err(anyhow::Error::from)?;
@@ -336,7 +367,11 @@ impl PublicKey {
     }
 
     /// MD5 验签（legacy，仅用于兼容）
-    pub fn verify_md5(&self, data: impl AsRef<[u8]>, signature: impl AsRef<[u8]>) -> anyhow::Result<()> {
+    pub fn verify_md5(
+        &self,
+        data: impl AsRef<[u8]>,
+        signature: impl AsRef<[u8]>,
+    ) -> anyhow::Result<()> {
         use rsa::pkcs1v15::{Signature, VerifyingKey};
         let sig = Signature::try_from(signature.as_ref()).map_err(anyhow::Error::from)?;
         VerifyingKey::<Md5>::new_unprefixed(self.key.clone())
@@ -345,7 +380,11 @@ impl PublicKey {
     }
 
     /// PSS 验签，salt 长度默认取哈希输出长度
-    pub fn verify_pss<D>(&self, data: impl AsRef<[u8]>, signature: impl AsRef<[u8]>) -> anyhow::Result<()>
+    pub fn verify_pss<D>(
+        &self,
+        data: impl AsRef<[u8]>,
+        signature: impl AsRef<[u8]>,
+    ) -> anyhow::Result<()>
     where
         D: Digest + digest::FixedOutputReset,
     {
@@ -353,7 +392,12 @@ impl PublicKey {
     }
 
     /// PSS 验签，指定 salt 长度
-    pub fn verify_pss_with_salt_len<D>(&self, data: impl AsRef<[u8]>, signature: impl AsRef<[u8]>, salt_len: usize) -> anyhow::Result<()>
+    pub fn verify_pss_with_salt_len<D>(
+        &self,
+        data: impl AsRef<[u8]>,
+        signature: impl AsRef<[u8]>,
+        salt_len: usize,
+    ) -> anyhow::Result<()>
     where
         D: Digest + digest::FixedOutputReset,
     {
@@ -379,7 +423,10 @@ impl PublicKey {
 
 fn public_key_from_spki(spki: SubjectPublicKeyInfoOwned) -> anyhow::Result<PublicKey> {
     if spki.algorithm.oid != rsa::pkcs1::ALGORITHM_OID {
-        return Err(anyhow!("X.509: not an RSA public key (oid {})", spki.algorithm.oid));
+        return Err(anyhow!(
+            "X.509: not an RSA public key (oid {})",
+            spki.algorithm.oid
+        ));
     }
     // SPKI 中 RSA 的 subjectPublicKey BIT STRING 内容即为 PKCS#1 RSAPublicKey 的 DER
     let der = spki.subject_public_key.raw_bytes();
@@ -399,8 +446,12 @@ pub fn pfx_to_private_key(pfx: impl AsRef<[u8]>, password: &str) -> anyhow::Resu
 /// 从 PFX/P12 提取 `(key_pem, cert_pem)`
 pub fn pfx_to_pem(pfx: impl AsRef<[u8]>, password: &str) -> anyhow::Result<(String, String)> {
     let p12 = p12::PFX::parse(pfx.as_ref()).map_err(|e| anyhow!("pfx parse: {e}"))?;
-    let key_bags = p12.key_bags(password).map_err(|e| anyhow!("pfx key: {e}"))?;
-    let cert_bags = p12.cert_bags(password).map_err(|e| anyhow!("pfx cert: {e}"))?;
+    let key_bags = p12
+        .key_bags(password)
+        .map_err(|e| anyhow!("pfx key: {e}"))?;
+    let cert_bags = p12
+        .cert_bags(password)
+        .map_err(|e| anyhow!("pfx cert: {e}"))?;
     if key_bags.is_empty() || cert_bags.is_empty() {
         return Err(anyhow!("pfx missing cert or key"));
     }
@@ -417,7 +468,10 @@ pub fn pfx_to_pem(pfx: impl AsRef<[u8]>, password: &str) -> anyhow::Result<(Stri
 
     let mut cert_pem = String::new();
     for cert in &cert_bags {
-        cert_pem.push_str(&pem::encode(&pem::Pem::new(CERTIFICATE.to_string(), cert.clone())));
+        cert_pem.push_str(&pem::encode(&pem::Pem::new(
+            CERTIFICATE.to_string(),
+            cert.clone(),
+        )));
     }
 
     Ok((key_pem, cert_pem))
@@ -445,7 +499,9 @@ mod tests {
     fn format_public_cert() {
         let raw = "MIIB";
         let pem = format_public_pem_raw(raw, PublicPemType::Certificate);
-        assert!(pem.contains(&format!("-----BEGIN {CERTIFICATE}-----\nMIIB\n-----END {CERTIFICATE}-----\n")));
+        assert!(pem.contains(&format!(
+            "-----BEGIN {CERTIFICATE}-----\nMIIB\n-----END {CERTIFICATE}-----\n"
+        )));
     }
 
     #[test]
@@ -490,7 +546,10 @@ mod tests {
 
     #[test]
     fn generate_pkcs1_roundtrip() {
-        let KeyPair { private_pem, public_pem } = generate_pkcs1_keypair(1024).unwrap();
+        let KeyPair {
+            private_pem,
+            public_pem,
+        } = generate_pkcs1_keypair(1024).unwrap();
         assert!(private_pem.contains(RSA_PRIVATE_KEY));
         assert!(public_pem.contains(RSA_PUBLIC_KEY));
         let prvk = PrivateKey::from_pem(private_pem.as_bytes()).unwrap();
@@ -502,7 +561,10 @@ mod tests {
 
     #[test]
     fn generate_pkcs8_roundtrip() {
-        let KeyPair { private_pem, public_pem } = generate_pkcs8_keypair(1024).unwrap();
+        let KeyPair {
+            private_pem,
+            public_pem,
+        } = generate_pkcs8_keypair(1024).unwrap();
         assert!(private_pem.contains(PRIVATE_KEY));
         assert!(public_pem.contains(PUBLIC_KEY));
         let prvk = PrivateKey::from_pem(private_pem.as_bytes()).unwrap();
@@ -512,7 +574,10 @@ mod tests {
 
     #[test]
     fn sign_verify() {
-        let KeyPair { private_pem, public_pem } = generate_pkcs8_keypair(1024).unwrap();
+        let KeyPair {
+            private_pem,
+            public_pem,
+        } = generate_pkcs8_keypair(1024).unwrap();
         let prvk = PrivateKey::from_pem(&private_pem).unwrap();
         let pubk = PublicKey::from_pem(&public_pem).unwrap();
         let data = b"hello rsa";
@@ -524,7 +589,10 @@ mod tests {
 
     #[test]
     fn encrypt_decrypt() {
-        let KeyPair { private_pem, public_pem } = generate_pkcs8_keypair(1024).unwrap();
+        let KeyPair {
+            private_pem,
+            public_pem,
+        } = generate_pkcs8_keypair(1024).unwrap();
         let prvk = PrivateKey::from_pem(&private_pem).unwrap();
         let pubk = PublicKey::from_pem(&public_pem).unwrap();
         let ct = pubk.encrypt(b"sensitive").unwrap();
@@ -533,7 +601,10 @@ mod tests {
 
     #[test]
     fn encrypt_decrypt_oaep() {
-        let KeyPair { private_pem, public_pem } = generate_pkcs8_keypair(1024).unwrap();
+        let KeyPair {
+            private_pem,
+            public_pem,
+        } = generate_pkcs8_keypair(1024).unwrap();
         let prvk = PrivateKey::from_pem(&private_pem).unwrap();
         let pubk = PublicKey::from_pem(&public_pem).unwrap();
         let ct = pubk.encrypt_oaep::<Sha1>(b"sensitive-oaep").unwrap();

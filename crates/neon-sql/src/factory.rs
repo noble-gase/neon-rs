@@ -79,7 +79,10 @@ fn trace_sql(sql: String, cost: Duration, err: Option<&anyhow::Error>) {
 /// 包装 insert 结果；唯一约束冲突时返回 [`InsertOutcome::Duplicate`]
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
 pub(crate) fn trace_insert_result<T, R, F>(
-    sql: String, cost: Duration, ret: Result<R, sqlx::Error>, map_ok: F,
+    sql: String,
+    cost: Duration,
+    ret: Result<R, sqlx::Error>,
+    map_ok: F,
 ) -> anyhow::Result<InsertOutcome<T>>
 where
     F: FnOnce(R) -> T,
@@ -104,7 +107,12 @@ where
 
 /// 包装 `execute` 结果（如 `rows_affected`）并触发 SQL 日志
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
-pub(crate) fn trace_execute_result<R, F>(sql: String, cost: Duration, ret: Result<R, sqlx::Error>, map_ok: F) -> anyhow::Result<u64>
+pub(crate) fn trace_execute_result<R, F>(
+    sql: String,
+    cost: Duration,
+    ret: Result<R, sqlx::Error>,
+    map_ok: F,
+) -> anyhow::Result<u64>
 where
     F: FnOnce(R) -> u64,
 {
@@ -123,7 +131,11 @@ where
 
 /// 包装查询类 SQL 结果并触发 [`set_sql_logger`] 回调
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
-pub(crate) fn trace_query_result<T>(sql: String, cost: Duration, ret: Result<T, sqlx::Error>) -> anyhow::Result<T> {
+pub(crate) fn trace_query_result<T>(
+    sql: String,
+    cost: Duration,
+    ret: Result<T, sqlx::Error>,
+) -> anyhow::Result<T> {
     match ret {
         Ok(v) => {
             trace_sql(sql, cost, None);

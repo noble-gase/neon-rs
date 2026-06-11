@@ -130,13 +130,15 @@ impl<T> InsertOutcome<T> {
 /// 判断 `sqlx::Error` 是否为唯一约束冲突
 #[inline]
 pub fn is_unique_violation(err: &sqlx::Error) -> bool {
-    err.as_database_error().is_some_and(|db| db.is_unique_violation())
+    err.as_database_error()
+        .is_some_and(|db| db.is_unique_violation())
 }
 
 /// 判断 `anyhow::Error` 内层是否为唯一约束冲突
 #[inline]
 pub fn is_unique_violation_anyhow(err: &anyhow::Error) -> bool {
-    err.downcast_ref::<sqlx::Error>().is_some_and(is_unique_violation)
+    err.downcast_ref::<sqlx::Error>()
+        .is_some_and(is_unique_violation)
 }
 
 #[cfg(test)]

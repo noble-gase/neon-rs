@@ -17,8 +17,17 @@ pub use neon_helper as helper;
 #[cfg(feature = "macros")]
 pub use neon_macro as macros;
 
-#[cfg(any(feature = "redis", feature = "redis-cluster", feature = "redis-sync-lock"))]
+#[cfg(any(
+    feature = "redis",
+    feature = "redis-cluster",
+    feature = "redis-sync-lock"
+))]
 pub use neon_redis as redix;
 
-#[cfg(any(feature = "sql", feature = "sql-mysql", feature = "sql-postgres", feature = "sql-sqlite"))]
+#[cfg(any(
+    feature = "sql",
+    feature = "sql-mysql",
+    feature = "sql-postgres",
+    feature = "sql-sqlite"
+))]
 pub use neon_sql as sql;

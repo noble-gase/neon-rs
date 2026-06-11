@@ -57,7 +57,10 @@ pub struct PoolParams {
 /// // 集群（需启用 `cluster` feature）
 /// let cluster = redix::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await?;
 /// ```
-pub async fn open<F>(dsn: Vec<impl AsRef<str>>, opt: Option<PoolParams>) -> anyhow::Result<bb8::Pool<F::Manager>>
+pub async fn open<F>(
+    dsn: Vec<impl AsRef<str>>,
+    opt: Option<PoolParams>,
+) -> anyhow::Result<bb8::Pool<F::Manager>>
 where
     F: Factory,
 {

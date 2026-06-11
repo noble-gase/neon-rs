@@ -174,7 +174,9 @@ impl GeoTransform {
         let lat = loc.lat * DEG_TO_RAD;
         let dl = (loc.lng - f64::from(meridian)) * DEG_TO_RAD;
 
-        let x_meridian = ep.a0 * lat - ep.a2 * (2.0 * lat).sin() / 2.0 + ep.a4 * (4.0 * lat).sin() / 4.0 - ep.a6 * (6.0 * lat).sin() / 6.0;
+        let x_meridian = ep.a0 * lat - ep.a2 * (2.0 * lat).sin() / 2.0
+            + ep.a4 * (4.0 * lat).sin() / 4.0
+            - ep.a6 * (6.0 * lat).sin() / 6.0;
 
         let sin_lat = lat.sin();
         let cos_lat = lat.cos();
@@ -228,7 +230,8 @@ impl GeoTransform {
 
         let mut bf0 = y / ep.a0;
         loop {
-            let y0 = -ep.a2 * (2.0 * bf0).sin() / 2.0 + ep.a4 * (4.0 * bf0).sin() / 4.0 - ep.a6 * (6.0 * bf0).sin() / 6.0;
+            let y0 = -ep.a2 * (2.0 * bf0).sin() / 2.0 + ep.a4 * (4.0 * bf0).sin() / 4.0
+                - ep.a6 * (6.0 * bf0).sin() / 6.0;
             let bf = (y - y0) / ep.a0;
             if (bf - bf0).abs() <= INV_A0_EPS {
                 bf0 = bf;
@@ -265,7 +268,8 @@ impl GeoTransform {
 
         let temp0 = x / (n * cos_bf);
         let temp1 = (1.0 + 2.0 * t2 + j2) * x3 / (6.0 * n3 * cos_bf);
-        let temp2 = (5.0 + 28.0 * t2 + 6.0 * j2 + 24.0 * t4 + 8.0 * t2 * j2) * x5 / (120.0 * n5 * cos_bf);
+        let temp2 =
+            (5.0 + 28.0 * t2 + 6.0 * j2 + 24.0 * t4 + 8.0 * t2 * j2) * x5 / (120.0 * n5 * cos_bf);
         let lng = (temp0 - temp1 + temp2) * RAD_TO_DEG + f64::from(point.meridian);
 
         Location::new(lng, lat)

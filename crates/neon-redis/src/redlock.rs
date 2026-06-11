@@ -80,7 +80,11 @@ impl RedLock {
     /// 阻塞式重试获取锁
     ///
     /// `attempts` 为最大尝试次数；相邻两次尝试间隔 `duration`
-    pub fn try_acquire(mut self, attempts: usize, duration: time::Duration) -> anyhow::Result<Option<Self>> {
+    pub fn try_acquire(
+        mut self,
+        attempts: usize,
+        duration: time::Duration,
+    ) -> anyhow::Result<Option<Self>> {
         let threshold = attempts.saturating_sub(1);
         for i in 0..attempts {
             self.set_nx()?;
@@ -159,7 +163,10 @@ impl RedLock {
 
     fn del_conn<C: Commands>(&mut self, conn: &mut C) -> anyhow::Result<()> {
         let token = self.token.take().unwrap();
-        let _: () = redis::Script::new(DEL).key(&self.key).arg(&token).invoke(conn)?;
+        let _: () = redis::Script::new(DEL)
+            .key(&self.key)
+            .arg(&token)
+            .invoke(conn)?;
         Ok(())
     }
 }
@@ -234,7 +241,11 @@ impl AsyncRedLock {
     /// 异步重试获取锁
     ///
     /// `attempts` 为最大尝试次数；相邻两次尝试间隔 `duration`
-    pub async fn try_acquire(mut self, attempts: usize, duration: time::Duration) -> anyhow::Result<Option<Self>> {
+    pub async fn try_acquire(
+        mut self,
+        attempts: usize,
+        duration: time::Duration,
+    ) -> anyhow::Result<Option<Self>> {
         let threshold = attempts.saturating_sub(1);
         for i in 0..attempts {
             self.set_nx().await?;
@@ -338,12 +349,20 @@ impl Drop for AsyncRedLock {
                 match pool {
                     AsyncPool::Single(p) => {
                         let mut conn = p.get().await?;
-                        script.key(&key).arg(&token).invoke_async::<()>(&mut *conn).await?;
+                        script
+                            .key(&key)
+                            .arg(&token)
+                            .invoke_async::<()>(&mut *conn)
+                            .await?;
                     }
                     #[cfg(feature = "cluster")]
                     AsyncPool::Cluster(p) => {
                         let mut conn = p.get().await?;
-                        script.key(&key).arg(&token).invoke_async::<()>(&mut *conn).await?;
+                        script
+                            .key(&key)
+                            .arg(&token)
+                            .invoke_async::<()>(&mut *conn)
+                            .await?;
                     }
                 }
                 Ok::<_, anyhow::Error>(())
@@ -387,9 +406,13 @@ mod tests {
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     fn test_red_lock() {
         let pool = r2d2::Pool::new(redis::Client::open("redis://127.0.0.1:6379").unwrap()).unwrap();
-        let lock = RedLock::new(SyncPool::Single(pool), "test_red_lock", Duration::from_secs(10))
-            .acquire()
-            .unwrap();
+        let lock = RedLock::new(
+            SyncPool::Single(pool),
+            "test_red_lock",
+            Duration::from_secs(10),
+        )
+        .acquire()
+        .unwrap();
         assert!(lock.is_some());
     }
 
@@ -399,22 +422,32 @@ mod tests {
     fn test_red_lock_cluster() {
         let cc = redis::cluster::ClusterClient::new(vec!["redis://127.0.0.1:6379"]).unwrap();
         let pool = r2d2::Pool::builder().build(cc).unwrap();
-        let lock = RedLock::new(SyncPool::Cluster(pool), "test_red_lock_cluster", Duration::from_secs(10))
-            .acquire()
-            .unwrap();
+        let lock = RedLock::new(
+            SyncPool::Cluster(pool),
+            "test_red_lock_cluster",
+            Duration::from_secs(10),
+        )
+        .acquire()
+        .unwrap();
         assert!(lock.is_some());
     }
 
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_async_red_lock() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         {
-            let lock = AsyncRedLock::new(AsyncPool::Single(pool), "test_async_red_lock", Duration::from_secs(10))
-                .acquire()
-                .await
-                .unwrap();
+            let lock = AsyncRedLock::new(
+                AsyncPool::Single(pool),
+                "test_async_red_lock",
+                Duration::from_secs(10),
+            )
+            .acquire()
+            .await
+            .unwrap();
             assert!(lock.is_some());
         }
 
@@ -425,13 +458,19 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_async_red_lock_cluster() {
-        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await.unwrap();
+        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None)
+            .await
+            .unwrap();
 
         {
-            let lock = AsyncRedLock::new(AsyncPool::Cluster(pool), "test_async_red_lock_cluster", Duration::from_secs(10))
-                .acquire()
-                .await
-                .unwrap();
+            let lock = AsyncRedLock::new(
+                AsyncPool::Cluster(pool),
+                "test_async_red_lock_cluster",
+                Duration::from_secs(10),
+            )
+            .acquire()
+            .await
+            .unwrap();
             assert!(lock.is_some());
         }
 

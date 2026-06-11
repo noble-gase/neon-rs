@@ -9,7 +9,10 @@ use crate::{CipherText, pkcs7_padding, pkcs7_unpadding};
 const BLOCK_SIZE: usize = 8;
 
 /// DES-ECB 加密（PKCS#7）
-pub fn des_encrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<CipherText> {
+pub fn des_encrypt_ecb(
+    key: impl AsRef<[u8]>,
+    data: impl AsRef<[u8]>,
+) -> anyhow::Result<CipherText> {
     let cipher = Des::new_from_slice(key.as_ref()).map_err(anyhow::Error::from)?;
     let mut buf = data.as_ref().to_vec();
     pkcs7_padding(&mut buf, BLOCK_SIZE)?;
@@ -17,7 +20,10 @@ pub fn des_encrypt_ecb(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow:
     let (blocks, tail) = Array::<u8, U8>::slice_as_chunks_mut(&mut buf);
     debug_assert!(tail.is_empty(), "pkcs7_padding 必产生整数倍块");
     cipher.encrypt_blocks(blocks);
-    Ok(CipherText { bytes: buf, tag_size: 0 })
+    Ok(CipherText {
+        bytes: buf,
+        tag_size: 0,
+    })
 }
 
 /// DES-ECB 解密（PKCS#7）

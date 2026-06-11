@@ -28,7 +28,8 @@ impl Parse for PartialAttr {
         // fields
         let content;
         parenthesized!(content in input);
-        let list: Punctuated<Ident, Token![,]> = content.parse_terminated(Ident::parse, Token![,])?;
+        let list: Punctuated<Ident, Token![,]> =
+            content.parse_terminated(Ident::parse, Token![,])?;
         let fields = list.into_iter().collect();
 
         // derives
@@ -40,10 +41,14 @@ impl Parse for PartialAttr {
                 if kw == "derive" {
                     let derives_content;
                     parenthesized!(derives_content in input);
-                    let list: Punctuated<Path, Token![,]> = derives_content.parse_terminated(Path::parse, Token![,])?;
+                    let list: Punctuated<Path, Token![,]> =
+                        derives_content.parse_terminated(Path::parse, Token![,])?;
                     derives = list.into_iter().collect();
                 } else {
-                    return Err(syn::Error::new_spanned(kw, "expected `derive(...)` after ','"));
+                    return Err(syn::Error::new_spanned(
+                        kw,
+                        "expected `derive(...)` after ','",
+                    ));
                 }
             }
         }
