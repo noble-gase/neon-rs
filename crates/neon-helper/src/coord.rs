@@ -166,6 +166,7 @@ impl GeoTransform {
     /// 经纬度 → 大地平面直角坐标
     pub fn bl2xy(&self, loc: Location) -> Point {
         let ep = self.ellipsoid;
+
         let mut meridian = self.meridian;
         if meridian < -180 {
             meridian = ((loc.lng + 1.5) / 3.0).trunc() as i32 * 3;
@@ -220,6 +221,7 @@ impl GeoTransform {
     /// 大地平面直角坐标 → 经纬度
     pub fn xy2bl(&self, point: Point) -> Location {
         let ep = self.ellipsoid;
+
         let mut x = point.x - FALSE_EASTING;
         let mut y = point.y;
 
