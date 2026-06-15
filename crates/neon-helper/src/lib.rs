@@ -4,6 +4,7 @@ pub mod coord;
 pub mod httpzip;
 pub mod params;
 pub mod tree;
+pub mod unit;
 pub mod urlencoded;
 pub mod zoned;
 
