@@ -1,6 +1,6 @@
 [package]
 name = "neon-redis"
-version = "0.1.0"
+version = "0.2.0"
 edition = { workspace = true }
 description = "redis toolkit"
 license = "MIT"
@@ -12,10 +12,13 @@ anyhow = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-bb8 = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 r2d2 = { workspace = true, optional = true }
-redis = { workspace = true, features = ["tokio-comp", "script"] }
+redis = { workspace = true, features = [
+    "tokio-comp",
+    "script",
+    "connection-manager",
+] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros"] }
@@ -24,3 +27,6 @@ tokio = { workspace = true, features = ["macros"] }
 default = []
 cluster = ["redis/cluster", "redis/cluster-async"]
 sync-lock = ["dep:r2d2", "redis/r2d2"]
+tls-rustls = ["redis/tokio-rustls-comp"]
+tls-rustls-insecure = ["tls-rustls", "redis/tls-rustls-insecure"]
+tls-native-tls = ["redis/tokio-native-tls-comp"]

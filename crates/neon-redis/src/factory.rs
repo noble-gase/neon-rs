@@ -1,37 +1,42 @@
-//! Redis 连接池：单节点与 Cluster（`cluster` feature）的 bb8 / r2d2 封装
+//! Redis 连接工厂：构建具体客户端（单节点 [`client::Single`](crate::client::Single) /
+//! Cluster [`client::Cluster`](crate::client::Cluster)）
 
-use bb8::ManageConnection;
+use std::future::Future;
 
-use crate::manager;
-
-/// 单节点 Redis 连接池
-pub type SinglePool = bb8::Pool<manager::RedisConnManager>;
-
-/// Redis Cluster 连接池
 #[cfg(feature = "cluster")]
-pub type ClusterPool = bb8::Pool<manager::RedisClusterManager>;
+use crate::client::AsyncCluster;
+use crate::{ConnOptions, client::AsyncSingle};
 
-/// 连接池工厂：根据 DSN 构建 bb8 `ManageConnection`
+/// 连接工厂：根据 DSN 异步建立具体客户端
 pub trait Factory {
-    type Manager: ManageConnection<Error: std::error::Error + Send + Sync + 'static>;
+    /// 建立的具体客户端类型（单节点 / Cluster）
+    type Client;
 
-    fn build(dsn: Vec<impl AsRef<str>>) -> anyhow::Result<Self::Manager>;
+    /// 建立客户端
+    fn open(
+        dsn: Vec<impl AsRef<str> + Send>,
+        opt: Option<ConnOptions>,
+    ) -> impl Future<Output = anyhow::Result<Self::Client>> + Send;
 }
 
 /// 单节点 Redis
 pub struct Single;
 
 impl Factory for Single {
-    type Manager = manager::RedisConnManager;
+    type Client = AsyncSingle;
 
-    fn build(dsn: Vec<impl AsRef<str>>) -> anyhow::Result<Self::Manager> {
+    async fn open(
+        dsn: Vec<impl AsRef<str> + Send>,
+        opt: Option<ConnOptions>,
+    ) -> anyhow::Result<AsyncSingle> {
         let first = dsn.first().ok_or_else(|| anyhow::anyhow!("DSN is empty"))?;
 
-        let client = redis::Client::open(first.as_ref())?;
-        let mut conn = client.get_connection()?;
-        let _ = redis::cmd("PING").query::<String>(&mut conn)?;
+        let client = match opt {
+            Some(o) => AsyncSingle::with_options(first.as_ref(), &o).await?,
+            None => AsyncSingle::new(first.as_ref()).await?,
+        };
 
-        Ok(manager::RedisConnManager::new(client))
+        Ok(client)
     }
 }
 
@@ -41,15 +46,19 @@ pub struct Cluster;
 
 #[cfg(feature = "cluster")]
 impl Factory for Cluster {
-    type Manager = manager::RedisClusterManager;
+    type Client = AsyncCluster;
 
-    fn build(dsn: Vec<impl AsRef<str>>) -> anyhow::Result<Self::Manager> {
-        let nodes: Vec<&str> = dsn.iter().map(|s| s.as_ref()).collect();
+    async fn open(
+        dsn: Vec<impl AsRef<str> + Send>,
+        opt: Option<ConnOptions>,
+    ) -> anyhow::Result<AsyncCluster> {
+        let nodes: Vec<String> = dsn.iter().map(|s| s.as_ref().to_string()).collect();
 
-        let client = redis::cluster::ClusterClient::new(nodes)?;
-        let mut conn = client.get_connection()?;
-        let _ = redis::cmd("PING").query::<String>(&mut conn)?;
+        let client = match opt {
+            Some(o) => AsyncCluster::with_options(nodes, &o).await?,
+            None => AsyncCluster::new(nodes).await?,
+        };
 
-        Ok(manager::RedisClusterManager::new(client))
+        Ok(client)
     }
 }

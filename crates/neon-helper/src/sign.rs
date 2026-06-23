@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 
 /// 参数字典（key 按字典序排序）
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Params(BTreeMap<String, String>);
+pub struct SignMap(BTreeMap<String, String>);
 
 /// 签名 encode 时 value 为空字符串的处理策略
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -22,7 +22,7 @@ pub enum EmptyMode {
     OnlyKey,
 }
 
-impl Params {
+impl SignMap {
     pub fn new() -> Self {
         Self(BTreeMap::new())
     }
@@ -116,7 +116,7 @@ impl Params {
         self.0.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     }
 
-    /// 从 URL query 字符串解析为 Params
+    /// 从 URL query 字符串解析为 SignMap
     ///
     /// 注意：重复 key 时保留**首次**出现的 value
     pub fn from_url_query(query: impl AsRef<str>) -> Self {
@@ -140,7 +140,7 @@ impl Params {
     }
 }
 
-impl<K, V> From<HashMap<K, V>> for Params
+impl<K, V> From<HashMap<K, V>> for SignMap
 where
     K: Eq + Hash + Into<String>,
     V: Into<String>,
@@ -150,13 +150,13 @@ where
     }
 }
 
-impl From<Params> for HashMap<String, String> {
-    fn from(params: Params) -> Self {
+impl From<SignMap> for HashMap<String, String> {
+    fn from(params: SignMap) -> Self {
         params.0.into_iter().collect()
     }
 }
 
-impl Deref for Params {
+impl Deref for SignMap {
     type Target = BTreeMap<String, String>;
 
     fn deref(&self) -> &Self::Target {
@@ -164,7 +164,7 @@ impl Deref for Params {
     }
 }
 
-impl DerefMut for Params {
+impl DerefMut for SignMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn encode_default() {
-        let mut params = Params::new();
+        let mut params = SignMap::new();
         params.insert("foo".into(), "quux".into());
         params.insert("bar".into(), "baz".into());
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
@@ -184,13 +184,13 @@ mod tests {
 
     #[test]
     fn encode_empty() {
-        assert_eq!(Params::new().encode("=", "&", None, None), "");
-        assert_eq!(Params::new().url_encode(), "");
+        assert_eq!(SignMap::new().encode("=", "&", None, None), "");
+        assert_eq!(SignMap::new().url_encode(), "");
     }
 
     #[test]
     fn encode_empty_modes() {
-        let mut params = Params::new();
+        let mut params = SignMap::new();
         params.insert("foo".into(), "".into());
         params.insert("bar".into(), "baz".into());
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=");
@@ -206,7 +206,7 @@ mod tests {
 
     #[test]
     fn encode_ignore_keys() {
-        let mut params = Params::new();
+        let mut params = SignMap::new();
         params.insert("foo".into(), "quux".into());
         params.insert("bar".into(), "baz".into());
         params.insert("sign".into(), "xx".into());
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn encode_ignore_keys_str_and_string() {
-        let mut params = Params::new();
+        let mut params = SignMap::new();
         params.insert("foo".into(), "quux".into());
         params.insert("sign".into(), "xx".into());
         let nonce = String::from("nonce");
@@ -233,7 +233,7 @@ mod tests {
         let mut map: HashMap<String, String> = HashMap::new();
         map.insert("foo".into(), "quux".into());
         map.insert("bar".into(), "baz".into());
-        let params = Params::from_hash_map(&map);
+        let params = SignMap::from_hash_map(&map);
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
         assert_eq!(map.len(), 2);
     }
@@ -243,7 +243,7 @@ mod tests {
         let mut map: HashMap<String, String> = HashMap::new();
         map.insert("foo".into(), "quux".into());
         map.insert("bar".into(), "baz".into());
-        let params = Params::from(map);
+        let params = SignMap::from(map);
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
     }
 
@@ -252,9 +252,9 @@ mod tests {
         let mut map = HashMap::new();
         map.insert("foo", "quux");
         map.insert("bar", "baz");
-        let params = Params::from_hash_map(&map);
+        let params = SignMap::from_hash_map(&map);
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
-        let params = Params::from(map);
+        let params = SignMap::from(map);
         assert_eq!(params.get("foo"), Some(&"quux".to_string()));
     }
 
@@ -263,26 +263,26 @@ mod tests {
         let mut map: HashMap<String, &str> = HashMap::new();
         map.insert("foo".into(), "quux");
         map.insert("bar".into(), "baz");
-        let params = Params::from_hash_map(&map);
+        let params = SignMap::from_hash_map(&map);
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
     }
 
     #[test]
     fn from_pairs_str_refs() {
-        let params = Params::from_pairs([("foo", "quux"), ("bar", "baz")]);
+        let params = SignMap::from_pairs([("foo", "quux"), ("bar", "baz")]);
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=quux");
     }
 
     #[test]
     fn from_pairs_duplicate_keys_first_wins() {
-        let params = Params::from_pairs([("foo", "first"), ("foo", "second"), ("bar", "baz")]);
+        let params = SignMap::from_pairs([("foo", "first"), ("foo", "second"), ("bar", "baz")]);
         assert_eq!(params.get("foo"), Some(&"first".to_string()));
         assert_eq!(params.get("bar"), Some(&"baz".to_string()));
     }
 
     #[test]
     fn from_pairs_owned_strings() {
-        let params = Params::from_pairs(vec![
+        let params = SignMap::from_pairs(vec![
             (String::from("foo"), String::from("quux")),
             (String::from("bar"), String::from("baz")),
         ]);
@@ -291,7 +291,7 @@ mod tests {
 
     #[test]
     fn to_hash_map_borrowed() {
-        let mut params = Params::new();
+        let mut params = SignMap::new();
         params.insert("foo".into(), "quux".into());
         params.insert("bar".into(), "baz".into());
         let map = params.to_hash_map();
@@ -305,21 +305,21 @@ mod tests {
         let mut expected: HashMap<String, String> = HashMap::new();
         expected.insert("foo".into(), "quux".into());
         expected.insert("bar".into(), "baz".into());
-        let params = Params::from(expected.clone());
+        let params = SignMap::from(expected.clone());
         let map: HashMap<_, _> = params.into();
         assert_eq!(map, expected);
     }
 
     #[test]
     fn from_url_query_duplicate_keys() {
-        let params = Params::from_url_query("foo=first&foo=second&bar=baz");
+        let params = SignMap::from_url_query("foo=first&foo=second&bar=baz");
         assert_eq!(params.get("foo"), Some(&"first".to_string()));
         assert_eq!(params.get("bar"), Some(&"baz".to_string()));
     }
 
     #[test]
     fn url_encode_format() {
-        let mut params = Params::new();
+        let mut params = SignMap::new();
         params.insert("a".into(), "1 2".into());
         params.insert("b".into(), "c&d".into());
         assert_eq!(params.url_encode(), "a=1+2&b=c%26d");
@@ -327,10 +327,10 @@ mod tests {
 
     #[test]
     fn url_encode_roundtrip() {
-        let mut params = Params::new();
+        let mut params = SignMap::new();
         params.insert("a".into(), "1 2".into());
         params.insert("b".into(), "c&d".into());
-        let back = Params::from_url_query(params.url_encode());
+        let back = SignMap::from_url_query(params.url_encode());
         assert_eq!(back.get("a"), Some(&"1 2".to_string()));
         assert_eq!(back.get("b"), Some(&"c&d".to_string()));
     }

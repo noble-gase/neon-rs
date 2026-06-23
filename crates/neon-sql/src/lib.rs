@@ -46,7 +46,7 @@ where
 
 /// 连接池参数
 #[derive(Default, Debug)]
-pub struct PoolParams {
+pub struct SqlOptions {
     /// 最小连接数，默认 10
     pub min_conns: Option<u32>,
     /// 最大连接数，默认 20
@@ -65,27 +65,27 @@ pub struct PoolParams {
 ///
 /// ```ignore
 /// // [MySQL] mysql://username:password@host:3306/db?charset=utf8mb4
-/// let pool = sql::open::<MySQL>("dsn".into(), None).await?;
+/// let pool = sql::open::<MySQL>("dsn", None).await?;
 ///
 /// // [PgSQL] postgres://username:password@host:5432/db
-/// let pool = sql::open::<PgSQL>("dsn".into(), None).await?;
+/// let pool = sql::open::<PgSQL>("dsn", None).await?;
 ///
 /// // [SQLite] sqlite:///path/to.db 或 sqlite::memory:
-/// let pool = sql::open::<SQLite>("dsn".into(), None).await?;
+/// let pool = sql::open::<SQLite>("dsn", None).await?;
 /// ```
-pub async fn open<F>(dsn: String, opt: Option<PoolParams>) -> anyhow::Result<Pool<F::DB>>
+pub async fn open<F>(dsn: impl AsRef<str>, opt: Option<SqlOptions>) -> anyhow::Result<Pool<F::DB>>
 where
     F: Factory,
 {
-    let params = opt.unwrap_or_default();
+    let o = opt.unwrap_or_default();
 
     let pool = F::build()
-        .min_connections(params.min_conns.unwrap_or(10))
-        .max_connections(params.max_conns.unwrap_or(20))
-        .acquire_timeout(params.conn_timeout.unwrap_or(Duration::from_secs(10)))
-        .idle_timeout(params.idle_timeout.unwrap_or(Duration::from_secs(300)))
-        .max_lifetime(params.max_lifetime.unwrap_or(Duration::from_secs(600)))
-        .connect(&dsn)
+        .min_connections(o.min_conns.unwrap_or(10))
+        .max_connections(o.max_conns.unwrap_or(20))
+        .acquire_timeout(o.conn_timeout.unwrap_or(Duration::from_secs(10)))
+        .idle_timeout(o.idle_timeout.unwrap_or(Duration::from_secs(300)))
+        .max_lifetime(o.max_lifetime.unwrap_or(Duration::from_secs(600)))
+        .connect(dsn.as_ref())
         .await?;
 
     Ok(pool)
@@ -93,7 +93,7 @@ where
 
 /// `insert` 的执行结果
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InsertOutcome<T> {
+pub enum InsertResult<T> {
     /// 插入成功
     ///
     /// `T` 为后端返回值：MySQL `last_insert_id`、SQLite `last_insert_rowid`、PostgreSQL 为 `RETURNING` 映射的行类型
@@ -102,14 +102,14 @@ pub enum InsertOutcome<T> {
     Duplicate,
 }
 
-impl<T> InsertOutcome<T> {
-    /// 是否为 [`InsertOutcome::Inserted`]
+impl<T> InsertResult<T> {
+    /// 是否为 [`InsertResult::Inserted`]
     #[inline]
     pub fn is_inserted(&self) -> bool {
         matches!(self, Self::Inserted(_))
     }
 
-    /// 是否为 [`InsertOutcome::Duplicate`]
+    /// 是否为 [`InsertResult::Duplicate`]
     #[inline]
     pub fn is_duplicate(&self) -> bool {
         matches!(self, Self::Duplicate)
@@ -145,7 +145,7 @@ pub fn is_unique_violation_anyhow(err: &anyhow::Error) -> bool {
 mod tests {
     use std::time::Duration;
 
-    use crate::InsertOutcome;
+    use crate::InsertResult;
     use crate::set_sql_logger;
 
     #[test]
@@ -166,12 +166,12 @@ mod tests {
 
     #[test]
     fn insert_outcome_helpers() {
-        let ok: InsertOutcome<u64> = InsertOutcome::Inserted(42);
+        let ok: InsertResult<u64> = InsertResult::Inserted(42);
         assert!(ok.is_inserted());
         assert!(!ok.is_duplicate());
         assert_eq!(ok.inserted(), Some(42));
 
-        let dup: InsertOutcome<u64> = InsertOutcome::Duplicate;
+        let dup: InsertResult<u64> = InsertResult::Duplicate;
         assert!(dup.is_duplicate());
         assert!(!dup.is_inserted());
         assert_eq!(dup.inserted(), None);

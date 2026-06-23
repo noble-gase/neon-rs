@@ -14,7 +14,7 @@ use sqlx::{Postgres, postgres::PgPoolOptions};
 use sqlx::{Sqlite, sqlite::SqlitePoolOptions};
 
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
-use crate::{InsertOutcome, is_unique_violation};
+use crate::{InsertResult, is_unique_violation};
 
 /// 连接池工厂：返回对应后端的 `PoolOptions`
 pub trait Factory {
@@ -76,26 +76,26 @@ fn trace_sql(sql: String, cost: Duration, err: Option<&anyhow::Error>) {
     }
 }
 
-/// 包装 insert 结果；唯一约束冲突时返回 [`InsertOutcome::Duplicate`]
+/// 包装 insert 结果；唯一约束冲突时返回 [`InsertResult::Duplicate`]
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
 pub(crate) fn trace_insert_result<T, R, F>(
     sql: String,
     cost: Duration,
     ret: Result<R, sqlx::Error>,
     map_ok: F,
-) -> anyhow::Result<InsertOutcome<T>>
+) -> anyhow::Result<InsertResult<T>>
 where
     F: FnOnce(R) -> T,
 {
     match ret {
         Ok(v) => {
             trace_sql(sql, cost, None);
-            Ok(InsertOutcome::Inserted(map_ok(v)))
+            Ok(InsertResult::Inserted(map_ok(v)))
         }
         Err(e) => {
             if is_unique_violation(&e) {
                 trace_sql(sql, cost, None);
-                Ok(InsertOutcome::Duplicate)
+                Ok(InsertResult::Duplicate)
             } else {
                 let err = anyhow::Error::from(e);
                 trace_sql(sql, cost, Some(&err));

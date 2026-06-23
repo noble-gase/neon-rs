@@ -10,7 +10,7 @@ use sea_query_sqlx::SqlxBinder;
 use sqlx::{AssertSqlSafe, Executor, FromRow, MySql, mysql::MySqlRow};
 
 use crate::{
-    InsertOutcome,
+    InsertResult,
     factory::{trace_execute_result, trace_insert_result, trace_query_result},
 };
 
@@ -27,7 +27,7 @@ use crate::{
 ///
 /// let ret = mysql::insert(&pool, stmt).await;
 /// ```
-pub async fn insert<'e, E>(db: E, stmt: InsertStatement) -> anyhow::Result<InsertOutcome<u64>>
+pub async fn insert<'e, E>(db: E, stmt: InsertStatement) -> anyhow::Result<InsertResult<u64>>
 where
     E: Executor<'e, Database = MySql>,
 {

@@ -1,81 +1,128 @@
-//! Redis 工具集：连接池、缓存 helper（`redkit`）、分布式锁（`redlock`）
+//! Redis 工具集：异步连接（`ConnectionManager` / 集群连接）、缓存 helper（`redkit`）、分布式锁（`redlock`）
+//!
+//! 异步路径基于 redis 自带的可共享 clone、自带自动重连的多路复用连接：
+//! - 单节点使用 [`redis::aio::ConnectionManager`]
+//! - 集群（`cluster` feature）使用 [`redis::cluster_async::ClusterConnection`]
 //!
 //! `redlock` 为单 key 互斥锁（`SET NX` + TTL），非 Antirez quorum Redlock
 
+pub mod client;
 pub mod factory;
-pub mod manager;
 pub mod redkit;
 pub mod redlock;
 
 use std::time::Duration;
 
+use redis::aio::ConnectionManagerConfig;
+
+#[cfg(feature = "cluster")]
+use redis::cluster::ClusterClient;
+
 use crate::factory::Factory;
 
-/// 同步分布式锁 [`redlock::RedLock`] 使用的连接池（Single / Cluster，需 `sync-lock` feature）
-#[cfg(feature = "sync-lock")]
-pub enum SyncPool {
-    /// 单节点 r2d2 连接池
-    Single(r2d2::Pool<redis::Client>),
+/// 连接参数：重连退避与超时配置
+///
+/// 单节点映射到 `ConnectionManagerConfig`
+///
+/// Cluster 映射到 `ClusterClientBuilder`
+#[derive(Default, Debug, Clone)]
+pub struct ConnOptions {
+    /// 连接断开后的最大重连次数，默认 6
+    pub number_of_retries: Option<usize>,
+    /// 重连退避的最小间隔（仅单节点）
+    pub min_delay: Option<Duration>,
+    /// 重连退避的最大间隔（仅单节点）
+    pub max_delay: Option<Duration>,
+    /// 指数退避底数（仅单节点）
+    pub exponent_base: Option<f32>,
+    /// 单条命令响应超时
+    pub response_timeout: Option<Duration>,
+    /// 建立连接超时
+    pub connection_timeout: Option<Duration>,
+}
+
+impl ConnOptions {
+    /// 转换为单节点 [`ConnectionManagerConfig`]
+    pub(crate) fn to_manager_config(&self) -> ConnectionManagerConfig {
+        let mut cfg = ConnectionManagerConfig::new();
+        if let Some(n) = self.number_of_retries {
+            cfg = cfg.set_number_of_retries(n);
+        }
+        if let Some(d) = self.min_delay {
+            cfg = cfg.set_min_delay(d);
+        }
+        if let Some(d) = self.max_delay {
+            cfg = cfg.set_max_delay(d);
+        }
+        if let Some(b) = self.exponent_base {
+            cfg = cfg.set_exponent_base(b);
+        }
+        if self.response_timeout.is_some() {
+            cfg = cfg.set_response_timeout(self.response_timeout);
+        }
+        if self.connection_timeout.is_some() {
+            cfg = cfg.set_connection_timeout(self.connection_timeout);
+        }
+        cfg
+    }
+
+    /// 将可用子集（重试次数、连接/响应超时）应用到集群 [`ClusterClientBuilder`](redis::cluster::ClusterClientBuilder)
+    ///
+    /// 退避相关参数（`min_delay` / `max_delay` / `exponent_base`）集群层不支持，忽略
     #[cfg(feature = "cluster")]
-    /// Redis Cluster r2d2 连接池
-    Cluster(r2d2::Pool<redis::cluster::ClusterClient>),
+    pub(crate) fn to_cluster_builder(
+        &self,
+        nodes: Vec<String>,
+    ) -> redis::cluster::ClusterClientBuilder {
+        let mut builder = ClusterClient::builder(nodes);
+        if let Some(n) = self.number_of_retries {
+            builder = builder.retries(n as u32);
+        }
+        if let Some(d) = self.connection_timeout {
+            builder = builder.connection_timeout(d);
+        }
+        if let Some(d) = self.response_timeout {
+            builder = builder.response_timeout(d);
+        }
+        builder
+    }
 }
 
-/// 异步 API 使用的连接池（[`redkit`]、[`redlock::AsyncRedLock`] 等；Single / Cluster）
-#[derive(Clone)]
-pub enum AsyncPool {
-    /// 单节点 bb8 连接池
-    Single(factory::SinglePool),
-    #[cfg(feature = "cluster")]
-    /// Redis Cluster bb8 连接池
-    Cluster(factory::ClusterPool),
-}
-
-/// 连接池参数
-#[derive(Default, Debug)]
-pub struct PoolParams {
-    /// 最大连接数，默认 100
-    pub max_size: Option<u32>,
-    /// 最小空闲连接数
-    pub min_idle: Option<u32>,
-    /// 获取连接超时，默认 10 秒
-    pub conn_timeout: Option<Duration>,
-    /// 空闲连接回收时间
-    pub idle_timeout: Option<Duration>,
-    /// 连接最大存活时间
-    pub max_lifetime: Option<Duration>,
-}
-
-/// 创建 Redis 连接池
+/// 建立 Redis 客户端，返回具体客户端类型
+///
+/// 具体客户端可用 `conn()` 取共享连接执行命令、`open_conn()` / `pubsub()` 新开独占连接；
+/// `conn()` 返回的连接句柄可直接传给 [`redkit`] / [`redlock`]
 ///
 /// # Examples
 ///
-/// ```
-/// // 单节点
-/// let pool = redix::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await?;
+/// DSN 格式：`redis://[<用户名>][:<密码>]@<host>:<port>[/<db>]`
 ///
-/// // 集群（需启用 `cluster` feature）
+/// TLS 支持：将 scheme 换成 `rediss://`（需启用本 crate 的 TLS feature：
+/// `tls-rustls`（rustls 后端）或 `tls-native-tls`（native-tls 后端））
+/// - `rediss://[<用户名>][:<密码>]@<host>:<port>[/<db>]`
+/// - 自签名证书 / 跳过证书校验：
+///     - 启用 `tls-rustls-insecure` feature
+///     - 在末尾加 `#insecure`，如：`rediss://<host>:<port>/0#insecure`
+///
+/// ```ignore
+/// // 单节点：得到 client::Single
+/// let single = redix::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await?;
+///
+/// // 单节点 + TLS
+/// let single = redix::open::<Single>(vec!["rediss://:pass@127.0.0.1:6380/0"], None).await?;
+///
+/// // 集群（需启用 `cluster` feature）：得到 client::Cluster
 /// let cluster = redix::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await?;
+///
+/// // 取共享连接执行命令 / 传给 redkit、redlock
+/// let mut conn = single.conn();
 /// ```
 pub async fn open<F>(
-    dsn: Vec<impl AsRef<str>>,
-    opt: Option<PoolParams>,
-) -> anyhow::Result<bb8::Pool<F::Manager>>
+    dsn: Vec<impl AsRef<str> + Send>,
+    opt: Option<ConnOptions>,
+) -> anyhow::Result<F::Client>
 where
     F: Factory,
 {
-    let manager = F::build(dsn)?;
-
-    let params = opt.unwrap_or_default();
-
-    let pool = bb8::Pool::builder()
-        .max_size(params.max_size.unwrap_or(100))
-        .min_idle(params.min_idle)
-        .connection_timeout(params.conn_timeout.unwrap_or(Duration::from_secs(10)))
-        .idle_timeout(params.idle_timeout)
-        .max_lifetime(params.max_lifetime)
-        .build(manager)
-        .await?;
-
-    Ok(pool)
+    F::open(dsn, opt).await
 }

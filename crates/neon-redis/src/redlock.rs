@@ -13,10 +13,6 @@ use std::time;
 use tokio::time::sleep;
 use uuid::Uuid;
 
-use crate::AsyncPool;
-#[cfg(feature = "sync-lock")]
-use crate::SyncPool;
-
 /// 释放锁脚本：仅当 value 与持有者 token 一致时才 `DEL`
 const DEL: &str = r#"
 if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -31,8 +27,8 @@ end
 /// # Examples
 ///
 /// ```ignore
-/// // 获取锁
-/// let lock = RedLock::new(pool, "key", Duration::from_secs(10)).acquire()?;
+/// // pool 为 r2d2::Pool<redis::Client> 或 r2d2::Pool<redis::cluster::ClusterClient>
+/// let lock = RedLock::new(pool.clone(), "key", Duration::from_secs(10)).acquire()?;
 /// if lock.is_none() {
 ///     return Err("operation is too frequent, please try again later")
 /// }
@@ -40,7 +36,7 @@ end
 /// lock.unwrap().release()?;
 ///
 /// // 尝试获取锁（重试3次，间隔100ms）
-/// let lock = RedLock::new(pool, "key", Duration::from_secs(10)).try_acquire(3, Duration::from_millis(100))?;
+/// let lock = RedLock::new(pool.clone(), "key", Duration::from_secs(10)).try_acquire(3, Duration::from_millis(100))?;
 /// if lock.is_none() {
 ///     return Err("operation is too frequent, please try again later")
 /// }
@@ -48,8 +44,12 @@ end
 /// lock.unwrap().release()?;
 /// ```
 #[cfg(feature = "sync-lock")]
-pub struct RedLock {
-    pool: SyncPool,
+pub struct RedLock<M>
+where
+    M: r2d2::ManageConnection,
+    M::Connection: Commands,
+{
+    pool: r2d2::Pool<M>,
     key: String,
     ttl: time::Duration,
     token: Option<String>,
@@ -57,11 +57,16 @@ pub struct RedLock {
 }
 
 #[cfg(feature = "sync-lock")]
-impl RedLock {
-    pub fn new(pool: SyncPool, key: impl AsRef<str>, ttl: time::Duration) -> Self {
+impl<M> RedLock<M>
+where
+    M: r2d2::ManageConnection,
+    M::Connection: Commands,
+{
+    /// `pool` 为 r2d2 连接池（单节点 `r2d2::Pool<redis::Client>` 或集群 `r2d2::Pool<ClusterClient>`）
+    pub fn new(pool: r2d2::Pool<M>, key: impl Into<String>, ttl: time::Duration) -> Self {
         RedLock {
             pool,
-            key: key.as_ref().to_string(),
+            key: key.into(),
             ttl,
             token: None,
             prevent: false,
@@ -104,17 +109,13 @@ impl RedLock {
             return Ok(());
         }
 
-        match &mut self.pool {
-            SyncPool::Single(pool) => {
-                let mut conn = pool.get()?;
-                self.del_conn(&mut conn)
-            }
-            #[cfg(feature = "cluster")]
-            SyncPool::Cluster(pool) => {
-                let mut conn = pool.get()?;
-                self.del_conn(&mut conn)
-            }
-        }
+        let token = self.token.take().unwrap();
+        let mut conn = self.pool.get()?;
+        let _: () = redis::Script::new(DEL)
+            .key(&self.key)
+            .arg(&token)
+            .invoke(&mut *conn)?;
+        Ok(())
     }
 
     /// 调用 `prevent` 后，Drop 时不会自动释放锁
@@ -123,25 +124,12 @@ impl RedLock {
     }
 
     fn set_nx(&mut self) -> anyhow::Result<()> {
-        match &mut self.pool {
-            SyncPool::Single(pool) => {
-                let mut conn = pool.get()?;
-                self.set_nx_conn(&mut conn)
-            }
-            #[cfg(feature = "cluster")]
-            SyncPool::Cluster(pool) => {
-                let mut conn = pool.get()?;
-                self.set_nx_conn(&mut conn)
-            }
-        }
-    }
-
-    fn set_nx_conn<C: Commands>(&mut self, conn: &mut C) -> anyhow::Result<()> {
         let new_token = Uuid::new_v4().to_string();
 
         let opts = redis::SetOptions::default()
             .conditional_set(NX)
             .with_expiration(EX(self.ttl.as_secs().max(1)));
+        let mut conn = self.pool.get()?;
         match conn.set_options(&self.key, &new_token, opts) {
             Ok(v) => {
                 if v {
@@ -160,20 +148,15 @@ impl RedLock {
             }
         }
     }
-
-    fn del_conn<C: Commands>(&mut self, conn: &mut C) -> anyhow::Result<()> {
-        let token = self.token.take().unwrap();
-        let _: () = redis::Script::new(DEL)
-            .key(&self.key)
-            .arg(&token)
-            .invoke(conn)?;
-        Ok(())
-    }
 }
 
 /// 自动释放锁
 #[cfg(feature = "sync-lock")]
-impl Drop for RedLock {
+impl<M> Drop for RedLock<M>
+where
+    M: r2d2::ManageConnection,
+    M::Connection: Commands,
+{
     fn drop(&mut self) {
         if self.prevent || self.token.is_none() {
             return;
@@ -190,8 +173,8 @@ impl Drop for RedLock {
 /// # Examples
 ///
 /// ```ignore
-/// // 获取锁
-/// let lock = AsyncRedLock::new(pool, "key", Duration::from_secs(10))
+/// // 获取锁（conn 由具体客户端提供，如 client.conn()）
+/// let lock = AsyncRedLock::new(client.conn(), "key", Duration::from_secs(10))
 ///     .acquire()
 ///     .await?;
 /// if lock.is_none() {
@@ -201,7 +184,7 @@ impl Drop for RedLock {
 /// lock.unwrap().release().await?;
 ///
 /// // 尝试获取锁（重试3次，间隔100ms）
-/// let lock = AsyncRedLock::new(pool, "key", Duration::from_secs(10))
+/// let lock = AsyncRedLock::new(client.conn(), "key", Duration::from_secs(10))
 ///     .try_acquire(3, Duration::from_millis(100))
 ///     .await?;
 /// if lock.is_none() {
@@ -210,19 +193,20 @@ impl Drop for RedLock {
 /// // 手动释放
 /// lock.unwrap().release().await?;
 /// ```
-pub struct AsyncRedLock {
-    pool: AsyncPool,
+pub struct AsyncRedLock<C: AsyncCommands + Clone + Send + 'static> {
+    conn: C,
     key: String,
     ttl: time::Duration,
     token: Option<String>,
     prevent: bool,
 }
 
-impl AsyncRedLock {
-    pub fn new(pool: AsyncPool, key: impl AsRef<str>, ttl: time::Duration) -> Self {
+impl<C: AsyncCommands + Clone + Send + 'static> AsyncRedLock<C> {
+    /// `conn` 为执行命令的连接（如 `client.conn()` 取得的 `ConnectionManager` / `ClusterConnection`）
+    pub fn new(conn: C, key: impl Into<String>, ttl: time::Duration) -> Self {
         AsyncRedLock {
-            pool,
-            key: key.as_ref().to_string(),
+            conn,
+            key: key.into(),
             ttl,
             token: None,
             prevent: false,
@@ -265,17 +249,13 @@ impl AsyncRedLock {
             return Ok(());
         }
 
-        match self.pool.clone() {
-            AsyncPool::Single(pool) => {
-                let mut conn = pool.get().await?;
-                self.del_conn(&mut *conn).await
-            }
-            #[cfg(feature = "cluster")]
-            AsyncPool::Cluster(pool) => {
-                let mut conn = pool.get().await?;
-                self.del_conn(&mut *conn).await
-            }
-        }
+        let token = self.token.take().unwrap();
+        redis::Script::new(DEL)
+            .key(&self.key)
+            .arg(&token)
+            .invoke_async::<()>(&mut self.conn)
+            .await?;
+        Ok(())
     }
 
     /// 调用 `prevent` 后，Drop 时不会自动释放锁
@@ -284,26 +264,12 @@ impl AsyncRedLock {
     }
 
     async fn set_nx(&mut self) -> anyhow::Result<()> {
-        match self.pool.clone() {
-            AsyncPool::Single(pool) => {
-                let mut conn = pool.get().await?;
-                self.set_nx_conn(&mut *conn).await
-            }
-            #[cfg(feature = "cluster")]
-            AsyncPool::Cluster(pool) => {
-                let mut conn = pool.get().await?;
-                self.set_nx_conn(&mut *conn).await
-            }
-        }
-    }
-
-    async fn set_nx_conn<C: AsyncCommands>(&mut self, conn: &mut C) -> anyhow::Result<()> {
         let new_token = Uuid::new_v4().to_string();
 
         let opts = redis::SetOptions::default()
             .conditional_set(NX)
             .with_expiration(EX(self.ttl.as_secs().max(1)));
-        match conn.set_options(&self.key, &new_token, opts).await {
+        match self.conn.set_options(&self.key, &new_token, opts).await {
             Ok(v) => {
                 if v {
                     self.token = Some(new_token);
@@ -312,7 +278,7 @@ impl AsyncRedLock {
             }
             Err(e) => {
                 // SET 异常时 GET 一次，避免因网络错误误判加锁失败
-                let ret_get: Option<String> = conn.get(&self.key).await?;
+                let ret_get: Option<String> = self.conn.get(&self.key).await?;
                 let v = ret_get.ok_or(e)?;
                 if v == new_token {
                     self.token = Some(new_token);
@@ -321,58 +287,41 @@ impl AsyncRedLock {
             }
         }
     }
-
-    async fn del_conn<C: AsyncCommands>(&mut self, conn: &mut C) -> anyhow::Result<()> {
-        let token = self.token.take().unwrap();
-        redis::Script::new(DEL)
-            .key(&self.key)
-            .arg(&token)
-            .invoke_async::<()>(conn)
-            .await?;
-        Ok(())
-    }
 }
 
-impl Drop for AsyncRedLock {
+impl<C: AsyncCommands + Clone + Send + 'static> Drop for AsyncRedLock<C> {
     fn drop(&mut self) {
         if self.prevent || self.token.is_none() {
             return;
         }
 
-        let pool = self.pool.clone();
         let key = self.key.clone();
         let token = self.token.take().unwrap();
+        let conn = self.conn.clone();
 
-        tokio::spawn(async move {
-            if let Err(e) = async {
-                let script = redis::Script::new(DEL);
-                match pool {
-                    AsyncPool::Single(p) => {
-                        let mut conn = p.get().await?;
-                        script
-                            .key(&key)
-                            .arg(&token)
-                            .invoke_async::<()>(&mut *conn)
-                            .await?;
-                    }
-                    #[cfg(feature = "cluster")]
-                    AsyncPool::Cluster(p) => {
-                        let mut conn = p.get().await?;
-                        script
-                            .key(&key)
-                            .arg(&token)
-                            .invoke_async::<()>(&mut *conn)
-                            .await?;
-                    }
-                }
-                Ok::<_, anyhow::Error>(())
-            }
-            .await
-            {
-                tracing::error!(err = ?e, "[neon-redis.async_red_lock] drop release(key={}) failed", key);
-            }
-        });
+        spawn_release(conn, key, token);
     }
+}
+
+/// Drop 中后台释放锁：在独立任务里执行 `DEL` 脚本（连接句柄需 `Send + 'static`）
+fn spawn_release<C>(mut conn: C, key: String, token: String)
+where
+    C: AsyncCommands + Send + 'static,
+{
+    tokio::spawn(async move {
+        if let Err(e) = async {
+            redis::Script::new(DEL)
+                .key(&key)
+                .arg(&token)
+                .invoke_async::<()>(&mut conn)
+                .await?;
+            Ok::<_, anyhow::Error>(())
+        }
+        .await
+        {
+            tracing::error!(err = ?e, "[neon-redis.async_red_lock] drop release(key={}) failed", key);
+        }
+    });
 }
 
 // `AsyncDrop` 稳定后可替换上方 `tokio::spawn` 方案，在 drop 中 await 释放锁
@@ -394,10 +343,9 @@ impl Drop for AsyncRedLock {
 mod tests {
     use std::time::Duration;
 
-    use crate::{
-        factory::{Cluster, Single},
-        open,
-    };
+    #[cfg(feature = "cluster")]
+    use crate::factory::Cluster;
+    use crate::{factory::Single, open};
 
     use super::*;
 
@@ -406,13 +354,9 @@ mod tests {
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     fn test_red_lock() {
         let pool = r2d2::Pool::new(redis::Client::open("redis://127.0.0.1:6379").unwrap()).unwrap();
-        let lock = RedLock::new(
-            SyncPool::Single(pool),
-            "test_red_lock",
-            Duration::from_secs(10),
-        )
-        .acquire()
-        .unwrap();
+        let lock = RedLock::new(pool, "test_red_lock", Duration::from_secs(10))
+            .acquire()
+            .unwrap();
         assert!(lock.is_some());
     }
 
@@ -422,26 +366,22 @@ mod tests {
     fn test_red_lock_cluster() {
         let cc = redis::cluster::ClusterClient::new(vec!["redis://127.0.0.1:6379"]).unwrap();
         let pool = r2d2::Pool::builder().build(cc).unwrap();
-        let lock = RedLock::new(
-            SyncPool::Cluster(pool),
-            "test_red_lock_cluster",
-            Duration::from_secs(10),
-        )
-        .acquire()
-        .unwrap();
+        let lock = RedLock::new(pool, "test_red_lock_cluster", Duration::from_secs(10))
+            .acquire()
+            .unwrap();
         assert!(lock.is_some());
     }
 
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_async_red_lock() {
-        let pool = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
+        let client = open::<Single>(vec!["redis://127.0.0.1:6379"], None)
             .await
             .unwrap();
 
         {
             let lock = AsyncRedLock::new(
-                AsyncPool::Single(pool),
+                client.conn(),
                 "test_async_red_lock",
                 Duration::from_secs(10),
             )
@@ -458,13 +398,13 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires local Redis cluster"]
     async fn test_async_red_lock_cluster() {
-        let pool = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None)
+        let client = open::<Cluster>(vec!["redis://127.0.0.1:6379"], None)
             .await
             .unwrap();
 
         {
             let lock = AsyncRedLock::new(
-                AsyncPool::Cluster(pool),
+                client.conn(),
                 "test_async_red_lock_cluster",
                 Duration::from_secs(10),
             )

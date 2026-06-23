@@ -14,13 +14,13 @@ cargo add neon-rs --features "crypto,macros,redis,sql-mysql"
 
 ## Crates
 
-| 模块     | 说明                                                    |
-| -------- | ------------------------------------------------------- |
-| `crypto` | 加密模块，包含：hash / aes / des / rsa                  |
-| `helper` | 辅助模块，包含：经纬度坐标转换、远程读取 ZIP 解析 等    |
-| `redis`  | Redis模块，包含：异步连接池、redlock 分布式锁、辅助方法 |
-| `sql`    | DB模块，包含：连接池 和 基于 `sea-query` 的 CRUD 封装   |
-| `macros` | `sqlx` 模型派生宏 `Model`                               |
+| 模块     | 说明                                                      |
+| -------- | --------------------------------------------------------- |
+| `crypto` | 加密模块，包含：hash / aes / des / rsa                    |
+| `helper` | 辅助模块，包含：经纬度坐标转换、远程读取 ZIP 解析 等      |
+| `redis`  | Redis模块，包含：异步连接创建、redlock 分布式锁、辅助方法 |
+| `sql`    | DB模块，包含：连接创建 和 基于 `sea-query` 的 CRUD 封装   |
+| `macros` | 宏模块，包含：`sqlx` 模型派生宏 `Model`                   |
 
 ## Features
 
@@ -31,10 +31,13 @@ cargo add neon-rs --features "crypto,macros,redis,sql-mysql"
   - `crypto-rsa` — RSA
 - **`helper`** — 一些辅助方法
 - **`macros`** — `sqlx` 模型派生宏 `Model`
-- **`redis`** — 异步连接池、redlock 分布式锁、辅助方法
-  - `redis-cluster` — Redis Cluster 异步连接池
+- **`redis`** — 异步连接创建、redlock 分布式锁、辅助方法
+  - `redis-cluster` — Redis Cluster 异步连接
   - `redis-sync-lock` — 同步 `RedLock`（r2d2）
-- **`sql`** — 连接池 和 基于 `sea-query` 的 CRUD 封装
+  - `redis-tls-rustls` — TLS（`rediss://`，rustls 后端）
+  - `redis-tls-rustls-insecure` — TLS + 跳过证书校验（自签名证书，`rediss://...#insecure`）
+  - `redis-tls-native-tls` — TLS（`rediss://`，native-tls 后端）
+- **`sql`** — 连接创建 和 基于 `sea-query` 的 CRUD 封装
   - `sql-mysql` — 仅 MySQL
   - `sql-postgres` — 仅 PostgreSQL
   - `sql-sqlite` — 仅 SQLite
@@ -56,17 +59,16 @@ cargo add neon-rs --features "crypto,macros,redis,sql-mysql"
 ```rust
 #[derive(Model)]
 #[model(UserLite !(email, phone))] // 排除字段
-#[model(UserBrief (id, name), derive(Copy, Debug))] // 包含字段
+#[model(UserBrief (id, age), derive(Copy, Debug))] // 包含字段
 pub struct User {
     pub id: i64,
 
     #[sqlx(rename = "username")]
     pub name: String,
 
+    pub age: i8
     pub email: String,
     pub phone: String,
-    pub created_at: String,
-    pub updated_at: String,
 }
 ```
 
@@ -80,16 +82,13 @@ pub struct UserLite {
     #[sqlx(rename = "username")]
     pub name: String,
 
-    pub created_at: String,
-    pub updated_at: String,
+    pub age: i8,
 }
 
 #[derive(sqlx::FromRow, Copy, Debug)]
 pub struct UserBrief {
     pub id: i64,
-
-    #[sqlx(rename = "username")]
-    pub name: String,
+    pub age: i8,
 }
 ```
 

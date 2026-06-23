@@ -1,6 +1,6 @@
 [package]
 name = "neon-rs"
-version = "0.1.0"
+version = "0.2.0"
 edition = { workspace = true }
 authors = ["ShengHui <847713844@qq.com>"]
 keywords = ["crypto", "hash", "redis", "redlock", "sql"]
@@ -68,7 +68,6 @@ sea-query-sqlx = { version = "0.9", default-features = false }
 # redis
 redis = { version = "1", default-features = false }
 r2d2 = "0.8"
-bb8 = "0.9"
 
 [dependencies]
 neon-core = { path = "crates/neon-core", version = "0", default-features = false }
@@ -100,6 +99,9 @@ macros = ["dep:neon-macro"]
 redis = ["dep:neon-redis"]
 redis-cluster = ["dep:neon-redis", "neon-redis/cluster"]
 redis-sync-lock = ["dep:neon-redis", "neon-redis/sync-lock"]
+redis-tls-rustls = ["dep:neon-redis", "neon-redis/tls-rustls"]
+redis-tls-rustls-insecure = ["dep:neon-redis", "neon-redis/tls-rustls-insecure"]
+redis-tls-native-tls = ["dep:neon-redis", "neon-redis/tls-native-tls"]
 
 sql = ["dep:neon-sql", "neon-sql/mysql", "neon-sql/postgres", "neon-sql/sqlite"]
 sql-mysql = ["dep:neon-sql", "neon-sql/mysql"]

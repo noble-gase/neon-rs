@@ -18,7 +18,7 @@ pub trait ToZoned {
     fn to_system_zoned(&self) -> anyhow::Result<Zoned>;
 
     /// 指定 IANA 时区（如 `"Asia/Shanghai"`）
-    fn to_zoned_in_tz(&self, tz: &str) -> anyhow::Result<Zoned>;
+    fn to_zoned_in_tz(&self, tz: impl AsRef<str>) -> anyhow::Result<Zoned>;
 }
 
 impl ToZoned for OffsetDateTime {
@@ -27,9 +27,9 @@ impl ToZoned for OffsetDateTime {
         Ok(ts.to_zoned(TimeZone::system()))
     }
 
-    fn to_zoned_in_tz(&self, tz: &str) -> anyhow::Result<Zoned> {
+    fn to_zoned_in_tz(&self, tz: impl AsRef<str>) -> anyhow::Result<Zoned> {
         let ts = Timestamp::from_nanosecond(self.unix_timestamp_nanos())?;
-        Ok(ts.in_tz(tz)?)
+        Ok(ts.in_tz(tz.as_ref())?)
     }
 }
 
@@ -57,8 +57,8 @@ impl ToZoned for UnixTime {
     fn to_system_zoned(&self) -> anyhow::Result<Zoned> {
         Ok(self.to_timestamp()?.to_zoned(TimeZone::system()))
     }
-    fn to_zoned_in_tz(&self, tz: &str) -> anyhow::Result<Zoned> {
-        Ok(self.to_timestamp()?.in_tz(tz)?)
+    fn to_zoned_in_tz(&self, tz: impl AsRef<str>) -> anyhow::Result<Zoned> {
+        Ok(self.to_timestamp()?.in_tz(tz.as_ref())?)
     }
 }
 

@@ -10,7 +10,7 @@ use sea_query_sqlx::SqlxBinder;
 use sqlx::{AssertSqlSafe, Executor, FromRow, Postgres, postgres::PgRow};
 
 use crate::{
-    InsertOutcome,
+    InsertResult,
     factory::{trace_execute_result, trace_insert_result, trace_query_result},
 };
 
@@ -28,7 +28,7 @@ use crate::{
 ///
 /// let ret = pgsql::insert::<_, _, model::Demo>(&pool, stmt).await;
 /// ```
-pub async fn insert<'e, E, T>(db: E, stmt: InsertStatement) -> anyhow::Result<InsertOutcome<T>>
+pub async fn insert<'e, E, T>(db: E, stmt: InsertStatement) -> anyhow::Result<InsertResult<T>>
 where
     E: Executor<'e, Database = Postgres>,
     T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
