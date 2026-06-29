@@ -7,6 +7,7 @@ use nacos_sdk::api::config::{
     ConfigChangeListener, ConfigResponse, ConfigService, ConfigServiceBuilder,
 };
 use nacos_sdk::api::props::ClientProps;
+use neon_core::traits::IntoStrVec;
 use serde::Deserialize;
 use tokio::sync::{Mutex, mpsc, watch};
 
@@ -86,40 +87,6 @@ impl std::fmt::Debug for NacosSource {
             .field("load_cache_at_start", &self.load_cache_at_start)
             .field("grpc_port", &self.grpc_port)
             .finish()
-    }
-}
-
-pub trait IntoStrVec {
-    fn into_str_vec(self) -> Vec<String>;
-}
-
-impl IntoStrVec for String {
-    fn into_str_vec(self) -> Vec<String> {
-        vec![self]
-    }
-}
-
-impl IntoStrVec for &str {
-    fn into_str_vec(self) -> Vec<String> {
-        vec![self.to_string()]
-    }
-}
-
-impl<T> IntoStrVec for Vec<T>
-where
-    T: Into<String>,
-{
-    fn into_str_vec(self) -> Vec<String> {
-        self.into_iter().map(Into::into).collect()
-    }
-}
-
-impl<T, const N: usize> IntoStrVec for [T; N]
-where
-    T: Into<String>,
-{
-    fn into_str_vec(self) -> Vec<String> {
-        self.into_iter().map(Into::into).collect()
     }
 }
 
