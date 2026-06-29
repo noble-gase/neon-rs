@@ -1,0 +1,28 @@
+[package]
+name = "neon-log"
+version = "0.1.0"
+edition = { workspace = true }
+description = "log toolkit"
+license = "MIT"
+repository = { workspace = true }
+
+[dependencies]
+tokio = { workspace = true, features = [
+    "rt",
+    "time",
+    "sync",
+    "macros",
+    "rt-multi-thread",
+] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = [
+    "env-filter",
+    "registry",
+    "fmt",
+] }
+aliyun-log-rust-sdk = { workspace = true, optional = true }
+aliyun-log-sdk-protobuf = { workspace = true, optional = true }
+
+[features]
+default = []
+sls = ["dep:aliyun-log-rust-sdk", "dep:aliyun-log-sdk-protobuf"]

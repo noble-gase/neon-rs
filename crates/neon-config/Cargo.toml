@@ -1,0 +1,31 @@
+[package]
+name = "neon-config"
+version = "0.1.0"
+edition = { workspace = true }
+description = "config toolkit"
+license = "MIT"
+repository = { workspace = true }
+
+[dependencies]
+tokio = { workspace = true, features = [
+    "macros",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+config = { workspace = true }
+nacos-sdk = { workspace = true, optional = true }
+
+[features]
+default = []
+config = []
+nacos = [
+    "dep:nacos-sdk",
+    "nacos-sdk/config",
+    "nacos-sdk/auth-by-http",
+    "nacos-sdk/auth-by-aliyun",
+]

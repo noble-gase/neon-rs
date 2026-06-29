@@ -26,7 +26,9 @@ proc-macro2 = "1"
 # common
 tokio = "1"
 anyhow = "1"
+thiserror = "2"
 tracing = "0.1"
+tracing-subscriber = "0.3"
 serde = "1"
 serde_json = "1"
 jiff = "0.2"
@@ -69,18 +71,30 @@ sea-query-sqlx = { version = "0.9", default-features = false }
 redis = { version = "1", default-features = false }
 r2d2 = "0.8"
 
+# config
+config = "0.15"
+nacos-sdk = "0.8"
+
+# log
+aliyun-log-rust-sdk = "0.3"
+aliyun-log-sdk-protobuf = "0.1"
+
 [dependencies]
 neon-core = { path = "crates/neon-core", version = "0", default-features = false }
+neon-config = { path = "crates/neon-config", version = "0", optional = true, default-features = false }
 neon-crypto = { path = "crates/neon-crypto", version = "0", optional = true, default-features = false }
 neon-helper = { path = "crates/neon-helper", version = "0", optional = true, default-features = false }
+neon-log = { path = "crates/neon-log", version = "0", optional = true, default-features = false }
 neon-macro = { path = "crates/neon-macros", version = "0", optional = true, default-features = false }
 neon-redis = { path = "crates/neon-redis", version = "0", optional = true, default-features = false }
 neon-sql = { path = "crates/neon-sql", version = "0", optional = true, default-features = false }
 
+
 [features]
 default = []
 
-helper = ["dep:neon-helper"]
+config = ["dep:neon-config", "neon-config/config"]
+config-nacos = ["dep:neon-config", "neon-config/nacos"]
 
 crypto = [
     "dep:neon-crypto",
@@ -93,6 +107,11 @@ crypto-hash = ["dep:neon-crypto", "neon-crypto/hash"]
 crypto-aes = ["dep:neon-crypto", "neon-crypto/aes"]
 crypto-des = ["dep:neon-crypto", "neon-crypto/des"]
 crypto-rsa = ["dep:neon-crypto", "neon-crypto/rsa"]
+
+helper = ["dep:neon-helper"]
+
+log = ["dep:neon-log", "neon-log/sls"]
+log-sls = ["dep:neon-log", "neon-log/sls"]
 
 macros = ["dep:neon-macro"]
 

@@ -2,6 +2,9 @@
 
 pub use neon_core as core;
 
+#[cfg(any(feature = "config", feature = "config-nacos"))]
+pub use neon_config as config;
+
 #[cfg(any(
     feature = "crypto",
     feature = "crypto-hash",
@@ -13,6 +16,9 @@ pub use neon_crypto as crypto;
 
 #[cfg(feature = "helper")]
 pub use neon_helper as helper;
+
+#[cfg(any(feature = "log", feature = "log-sls"))]
+pub use neon_log as log;
 
 #[cfg(feature = "macros")]
 pub use neon_macro as macros;
