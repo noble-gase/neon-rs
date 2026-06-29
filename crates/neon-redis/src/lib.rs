@@ -13,6 +13,7 @@ pub mod redlock;
 
 use std::time::Duration;
 
+use neon_core::traits::IntoStrVec;
 use redis::aio::ConnectionManagerConfig;
 
 #[cfg(feature = "cluster")]
@@ -27,27 +28,25 @@ use crate::factory::Factory;
 /// Cluster 映射到 `ClusterClientBuilder`
 #[derive(Default, Debug, Clone)]
 pub struct ConnOptions {
-    /// 连接断开后的最大重连次数，默认 6
-    pub number_of_retries: Option<usize>,
     /// 重连退避的最小间隔（仅单节点）
     pub min_delay: Option<Duration>,
     /// 重连退避的最大间隔（仅单节点）
     pub max_delay: Option<Duration>,
     /// 指数退避底数（仅单节点）
     pub exponent_base: Option<f32>,
+    /// 连接断开后的最大重连次数，默认 6
+    pub retry_count: Option<usize>,
+    /// 建立连接超时
+    pub connect_timeout: Option<Duration>,
     /// 单条命令响应超时
     pub response_timeout: Option<Duration>,
-    /// 建立连接超时
-    pub connection_timeout: Option<Duration>,
 }
 
 impl ConnOptions {
     /// 转换为单节点 [`ConnectionManagerConfig`]
     pub(crate) fn to_manager_config(&self) -> ConnectionManagerConfig {
         let mut cfg = ConnectionManagerConfig::new();
-        if let Some(n) = self.number_of_retries {
-            cfg = cfg.set_number_of_retries(n);
-        }
+
         if let Some(d) = self.min_delay {
             cfg = cfg.set_min_delay(d);
         }
@@ -57,12 +56,16 @@ impl ConnOptions {
         if let Some(b) = self.exponent_base {
             cfg = cfg.set_exponent_base(b);
         }
+        if let Some(n) = self.retry_count {
+            cfg = cfg.set_number_of_retries(n);
+        }
+        if self.connect_timeout.is_some() {
+            cfg = cfg.set_connection_timeout(self.connect_timeout);
+        }
         if self.response_timeout.is_some() {
             cfg = cfg.set_response_timeout(self.response_timeout);
         }
-        if self.connection_timeout.is_some() {
-            cfg = cfg.set_connection_timeout(self.connection_timeout);
-        }
+
         cfg
     }
 
@@ -75,10 +78,10 @@ impl ConnOptions {
         nodes: Vec<String>,
     ) -> redis::cluster::ClusterClientBuilder {
         let mut builder = ClusterClient::builder(nodes);
-        if let Some(n) = self.number_of_retries {
+        if let Some(n) = self.retry_count {
             builder = builder.retries(n as u32);
         }
-        if let Some(d) = self.connection_timeout {
+        if let Some(d) = self.connect_timeout {
             builder = builder.connection_timeout(d);
         }
         if let Some(d) = self.response_timeout {
@@ -104,25 +107,26 @@ impl ConnOptions {
 ///     - 启用 `tls-rustls-insecure` feature
 ///     - 在末尾加 `#insecure`，如：`rediss://<host>:<port>/0#insecure`
 ///
+/// `dsn` 支持单地址字符串或地址列表，例如：
+/// - `"redis://127.0.0.1:6379"`
+/// - `["redis://127.0.0.1:6379", "redis://127.0.0.1:6380"]`
+///
 /// ```ignore
 /// // 单节点：得到 client::Single
-/// let single = redix::open::<Single>(vec!["redis://127.0.0.1:6379"], None).await?;
+/// let single = redix::open::<Single>("redis://127.0.0.1:6379", None).await?;
 ///
 /// // 单节点 + TLS
-/// let single = redix::open::<Single>(vec!["rediss://:pass@127.0.0.1:6380/0"], None).await?;
+/// let single = redix::open::<Single>("rediss://:pass@127.0.0.1:6380/0", None).await?;
 ///
 /// // 集群（需启用 `cluster` feature）：得到 client::Cluster
-/// let cluster = redix::open::<Cluster>(vec!["redis://127.0.0.1:6379"], None).await?;
+/// let cluster = redix::open::<Cluster>(["redis://127.0.0.1:6379"], None).await?;
 ///
 /// // 取共享连接执行命令 / 传给 redkit、redlock
 /// let mut conn = single.conn();
 /// ```
-pub async fn open<F>(
-    dsn: Vec<impl AsRef<str> + Send>,
-    opt: Option<ConnOptions>,
-) -> anyhow::Result<F::Client>
+pub async fn open<F>(dsn: impl IntoStrVec, opt: Option<ConnOptions>) -> anyhow::Result<F::Client>
 where
     F: Factory,
 {
-    F::open(dsn, opt).await
+    F::open(dsn.into_str_vec(), opt).await
 }

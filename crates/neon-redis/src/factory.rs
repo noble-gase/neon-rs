@@ -14,7 +14,7 @@ pub trait Factory {
 
     /// 建立客户端
     fn open(
-        dsn: Vec<impl AsRef<str> + Send>,
+        dsn: Vec<String>,
         opt: Option<ConnOptions>,
     ) -> impl Future<Output = anyhow::Result<Self::Client>> + Send;
 }
@@ -25,10 +25,7 @@ pub struct Single;
 impl Factory for Single {
     type Client = AsyncSingle;
 
-    async fn open(
-        dsn: Vec<impl AsRef<str> + Send>,
-        opt: Option<ConnOptions>,
-    ) -> anyhow::Result<AsyncSingle> {
+    async fn open(dsn: Vec<String>, opt: Option<ConnOptions>) -> anyhow::Result<AsyncSingle> {
         let first = dsn.first().ok_or_else(|| anyhow::anyhow!("DSN is empty"))?;
 
         let client = match opt {
@@ -48,15 +45,10 @@ pub struct Cluster;
 impl Factory for Cluster {
     type Client = AsyncCluster;
 
-    async fn open(
-        dsn: Vec<impl AsRef<str> + Send>,
-        opt: Option<ConnOptions>,
-    ) -> anyhow::Result<AsyncCluster> {
-        let nodes: Vec<String> = dsn.iter().map(|s| s.as_ref().to_string()).collect();
-
+    async fn open(dsn: Vec<String>, opt: Option<ConnOptions>) -> anyhow::Result<AsyncCluster> {
         let client = match opt {
-            Some(o) => AsyncCluster::with_options(nodes, &o).await?,
-            None => AsyncCluster::new(nodes).await?,
+            Some(o) => AsyncCluster::with_options(dsn, &o).await?,
+            None => AsyncCluster::new(dsn).await?,
         };
 
         Ok(client)
