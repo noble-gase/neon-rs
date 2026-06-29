@@ -2022,10 +2022,11 @@ dependencies = [
 
 [[package]]
 name = "neon-config"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "config",
  "nacos-sdk",
+ "neon-core",
  "serde",
  "thiserror",
  "tokio",
@@ -2034,7 +2035,7 @@ dependencies = [
 
 [[package]]
 name = "neon-core"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "neon-crypto"
@@ -2102,9 +2103,10 @@ dependencies = [
 
 [[package]]
 name = "neon-redis"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
+ "neon-core",
  "r2d2",
  "redis",
  "serde",
@@ -2116,7 +2118,7 @@ dependencies = [
 
 [[package]]
 name = "neon-rs"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "neon-config",
  "neon-core",
