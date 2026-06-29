@@ -22,7 +22,6 @@ nacos-sdk = { workspace = true, optional = true }
 
 [features]
 default = []
-config = []
 nacos = [
     "dep:nacos-sdk",
     "nacos-sdk/config",

@@ -93,7 +93,7 @@ neon-sql = { path = "crates/neon-sql", version = "0", optional = true, default-f
 [features]
 default = []
 
-config = ["dep:neon-config", "neon-config/config"]
+config = ["dep:neon-config", "neon-config/nacos"]
 config-nacos = ["dep:neon-config", "neon-config/nacos"]
 
 crypto = [
