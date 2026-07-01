@@ -80,6 +80,8 @@ nacos-sdk = { version = "0.8", default-features = false }
 # log
 aliyun-log-rust-sdk = "0.3"
 aliyun-log-sdk-protobuf = "0.1"
+arc-swap = "1"
+crossbeam-queue = "0.3"
 
 [dependencies]
 neon-core = { path = "crates/neon-core", version = "0", default-features = false }

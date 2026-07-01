@@ -2083,10 +2083,12 @@ dependencies = [
 
 [[package]]
 name = "neon-log"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aliyun-log-rust-sdk",
  "aliyun-log-sdk-protobuf",
+ "arc-swap",
+ "crossbeam-queue",
  "tokio",
  "tracing",
  "tracing-subscriber",

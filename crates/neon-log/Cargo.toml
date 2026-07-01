@@ -1,6 +1,6 @@
 [package]
 name = "neon-log"
-version = "0.1.0"
+version = "0.2.0"
 edition = { workspace = true }
 description = "log toolkit"
 license = "MIT"
@@ -22,7 +22,14 @@ tracing-subscriber = { workspace = true, features = [
 ] }
 aliyun-log-rust-sdk = { workspace = true, optional = true }
 aliyun-log-sdk-protobuf = { workspace = true, optional = true }
+arc-swap = { workspace = true, optional = true }
+crossbeam-queue = { workspace = true, optional = true }
 
 [features]
 default = []
-sls = ["dep:aliyun-log-rust-sdk", "dep:aliyun-log-sdk-protobuf"]
+sls = [
+    "dep:aliyun-log-rust-sdk",
+    "dep:aliyun-log-sdk-protobuf",
+    "dep:arc-swap",
+    "dep:crossbeam-queue",
+]

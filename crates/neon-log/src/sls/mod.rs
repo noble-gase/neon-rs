@@ -28,20 +28,25 @@
 //! use tracing_subscriber::{EnvFilter, fmt};
 //!
 //! use neon_log::sls::{
-//!     DEFAULT_EW_QUEUE_CAPACITY, SlsConfig, SlsLayerBuilder, build,
+//!     DEFAULT_EW_QUEUE_CAPACITY, SlsConfig, SlsLayerBuilder, StaticCredentialsProvider, build,
 //! };
 //!
 //! // ===== 1. 配置 SLS（凭据勿硬编码，从环境变量或配置中心读取）=====
+//! // 长期 AccessKey 用 StaticCredentialsProvider 作为凭据来源
 //! let config = SlsConfig::new(
 //!     std::env::var("SLS_ENDPOINT").expect("SLS_ENDPOINT"),
-//!     std::env::var("SLS_ACCESS_KEY_ID").expect("SLS_ACCESS_KEY_ID"),
-//!     std::env::var("SLS_ACCESS_KEY_SECRET").expect("SLS_ACCESS_KEY_SECRET"),
 //!     std::env::var("SLS_PROJECT").expect("SLS_PROJECT"),
 //!     std::env::var("SLS_LOGSTORE").expect("SLS_LOGSTORE"),
+//!     StaticCredentialsProvider::new(
+//!         std::env::var("SLS_ACCESS_KEY_ID").expect("SLS_ACCESS_KEY_ID"),
+//!         std::env::var("SLS_ACCESS_KEY_SECRET").expect("SLS_ACCESS_KEY_SECRET"),
+//!     ),
 //! )
 //! .topic("my-service")                       // 可选
 //! .source("127.0.0.1")                       // 可选
 //! .max_inflight(4)                           // 可选，默认 4
+//! .max_batch_bytes(512 * 1024)               // 可选，按字节冲刷，默认 512KB
+//! .no_retry_status([400, 404])               // 可选，命中即不重试，默认 [400, 404]
 //! .flush_interval(Duration::from_secs(2));   // 可选，默认 2s
 //!
 //! // ===== 2. 构建 SLS 层与守卫 =====
@@ -84,9 +89,9 @@
 //! 若不需要自定义 topic / 队列，可直接用 [`build`]：
 //!
 //! ```ignore
-//! use neon_log::sls::{SlsConfig, build};
+//! use neon_log::sls::{SlsConfig, StaticCredentialsProvider, build};
 //!
-//! let config = SlsConfig::new(endpoint, ak_id, ak_secret, project, logstore);
+//! let config = SlsConfig::new(endpoint, project, logstore, StaticCredentialsProvider::new(ak_id, ak_secret));
 //! let (sls_layer, _guard) = build(config).expect("init sls layer");
 //! // 默认：ERROR/WARN 一条 sink + INFO/DEBUG/TRACE 一条 sink，各自独立 client
 //! // ERROR/WARN 队列容量上限为 DEFAULT_EW_QUEUE_CAPACITY（8192）
@@ -134,9 +139,40 @@
 //! - 进程被强杀（SIGKILL）时 guard 的 drop 不会执行
 //! - 日志时间戳秒部分为 `u32`（SLS SDK 约束），2106 年溢出
 //! - 不要在日志或 `Debug` 输出中打印 [`SlsConfig`]，以免泄漏凭据
+//! - 批量冲刷同时受条数（`max_batch_size`）与字节（`max_batch_bytes`）两个阈值约束，
+//!   任一达标即触发；字节数按各字段 key+value 的 UTF-8 长度估算，钳制在 [1KB, 4MB]
+//! - `no_retry_status` 命中的服务端错误（默认 400/404）不重试，直接计为 `send_failed` 丢弃
+//! - 凭据均经 [`CredentialsProvider`] 提供，长期 AccessKey 用 [`StaticCredentialsProvider`]，
+//!   STS 临时凭据用自定义实现或闭包。
+//!   worker 启动时调用一次 provider 构建 client；若凭据带 `expire_time` 则**按有效期精确刷新**
+//!   （到期前 [`SlsConfig::credentials_refresh_ahead`]，默认 5min）；若不带有效期且未设
+//!   [`SlsConfig::credentials_refresh_interval`]（长期 AccessKey 即属此类）则不再周期刷新；
+//!   提供器失败仅告警并沿用旧凭据，且在最短间隔（60s）后尽快重试
+//!
+//! ## STS 自动刷新示例
+//!
+//! ```ignore
+//! use std::time::Duration;
+//! use neon_log::sls::{SlsConfig, SlsCredentials};
+//!
+//! // 任意 `Fn() -> Result<SlsCredentials, BoxError>` 闭包都自动实现 CredentialsProvider；
+//! // 提供器可进行阻塞式网络请求（运行在 spawn_blocking 上），必须线程安全
+//! let provider = || {
+//!     let (id, secret, token, expire) = fetch_sts_from_metadata()?; // 用户自定义，expire 为 SystemTime
+//!     // 带上到期时间，worker 就会在到期前提前刷新（不带则默认不再刷新，可用 credentials_refresh_interval 开启固定间隔）
+//!     Ok(SlsCredentials::new(id, secret, token).expire_time(expire))
+//! };
+//!
+//! // provider 作为唯一凭据来源直接传入 new，无需再传 AccessKey
+//! let config = SlsConfig::new(endpoint, project, logstore, provider)
+//!     .credentials_refresh_ahead(Duration::from_secs(5 * 60)); // 到期前提前量
+//! ```
 
 pub mod layer;
 pub mod sink;
 
 pub use layer::{DEFAULT_EW_QUEUE_CAPACITY, SlsLayer, SlsLayerBuilder, build};
-pub use sink::{BoxError, DropSnapshot, SlsBuildError, SlsConfig, SlsGuard, SlsSink};
+pub use sink::{
+    BoxError, CredentialsProvider, DropSnapshot, SlsBuildError, SlsConfig, SlsCredentials,
+    SlsGuard, SlsSink, StaticCredentialsProvider,
+};
