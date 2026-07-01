@@ -1,6 +1,6 @@
 [package]
 name = "neon-rs"
-version = "0.2.2"
+version = "0.2.3"
 edition = { workspace = true }
 authors = ["ShengHui <847713844@qq.com>"]
 keywords = ["crypto", "hash", "redis", "redlock", "sql"]

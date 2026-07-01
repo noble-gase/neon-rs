@@ -2022,7 +2022,7 @@ dependencies = [
 
 [[package]]
 name = "neon-config"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "config",
  "nacos-sdk",
@@ -2120,7 +2120,7 @@ dependencies = [
 
 [[package]]
 name = "neon-rs"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "neon-config",
  "neon-core",

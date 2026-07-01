@@ -1,4 +1,4 @@
-//! 基于 `nacos-sdk` 与 `config` crate 的 Nacos 配置。
+//! 基于 `nacos-sdk` 与 `config` crate 的 Nacos 配置
 //!
 //! # 启用方式
 //!
@@ -9,7 +9,7 @@
 //! ```
 //!
 //! 通过 [`neon`](https://github.com/noble-gase/neon-rs) 聚合 crate 使用时，启用 `config-nacos` feature，
-//! 并通过 `neon::config::nacos` 访问本模块。
+//! 并通过 `neon::config::nacos` 访问本模块
 //!
 //! # 能力
 //!
@@ -72,7 +72,7 @@
 //! # 热更新
 //!
 //! 热更新是自动的：远程环境下 nacos 推送变更后，内部监听器会自动重新解析并更新快照，
-//! 之后再调用 `cfg.get_*(...)` 即可拿到最新值，**无需手动订阅**。
+//! 之后再调用 `cfg.get_*(...)` 即可拿到最新值，**无需手动订阅**
 //!
 //! ```no_run
 //! use neon_config::nacos::NacosConfig;
