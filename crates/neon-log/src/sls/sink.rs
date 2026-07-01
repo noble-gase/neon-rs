@@ -167,7 +167,7 @@ impl SlsCredentials {
 
 /// 凭据提供器：sink 启动及后续刷新时调用它获取一组鉴权凭据
 ///
-/// 这是 SLS 鉴权的**唯一入口**（对齐 Go SDK 的 CredentialsProvider 模型）：
+/// 这是 SLS 鉴权的**唯一入口**，
 /// 长期 AccessKey 用 [`StaticCredentialsProvider`]，STS 临时凭据用自定义实现或闭包。
 ///
 /// - `provide` 会在后台 worker 的 `spawn_blocking` 中被调用，允许内部进行阻塞式网络请求；
@@ -190,8 +190,6 @@ where
 }
 
 /// 长期 AccessKey 的静态凭据提供器：始终返回同一组固定凭据，永不刷新
-///
-/// 对应 Go SDK 的 `NewStaticCredentialsProvider`，用于最常见的长期 AccessKey 场景。
 pub struct StaticCredentialsProvider {
     creds: SlsCredentials,
 }
