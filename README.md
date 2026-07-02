@@ -70,7 +70,7 @@ let port = cfg.get_int("server.port")?;
 
 ### 阿里云 SLS 日志
 
-启用 `log` 或 `log-sls` 后，通过 `neon::log::sls` 接入 tracing Layer，业务线程几乎零阻塞。详见 [`neon-log` 模块文档](crates/neon-log/src/sls/mod.rs)。
+启用 `log` 或 `log-sls` 后，通过 `neon::log::sls` 接入 tracing Layer：无锁有界队列解耦生产与投递，后台 worker 负责攒批与异步发送，热路径 lock-free、零 I/O。详见 [`neon-log` 模块文档](crates/neon-log/src/sls/mod.rs)。
 
 ```rust
 use neon::log::sls::{SlsConfig, StaticCredentialsProvider, build};
