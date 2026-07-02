@@ -7,20 +7,22 @@ pub enum Format {
     Yaml,
     Json,
     Json5,
-    /// `.ini` / `.properties` 等键值对格式
     Ini,
     Ron,
 }
 
 impl Format {
     /// 根据文件扩展名推断格式，例如 `yaml` / `yml` / `toml`
+    ///
+    /// `.conf` 等内容格式不确定的扩展名不参与推断（可能是 nginx / HOCON / INI 等），
+    /// 会返回 `None` 并由上层报 `UnknownFormat`，提示显式指定 format
     pub fn from_extension(ext: &str) -> Option<Self> {
         match ext.trim().to_ascii_lowercase().as_str() {
             "yaml" | "yml" => Some(Self::Yaml),
             "toml" => Some(Self::Toml),
             "json" => Some(Self::Json),
             "json5" => Some(Self::Json5),
-            "ini" | "properties" | "conf" => Some(Self::Ini),
+            "ini" | "properties" => Some(Self::Ini),
             "ron" => Some(Self::Ron),
             _ => None,
         }

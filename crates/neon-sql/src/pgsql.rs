@@ -11,7 +11,7 @@ use sqlx::{AssertSqlSafe, Executor, FromRow, Postgres, postgres::PgRow};
 
 use crate::{
     InsertResult,
-    factory::{trace_execute_result, trace_insert_result, trace_query_result},
+    factory::{log_sql, trace_execute_result, trace_insert_result, trace_query_result},
 };
 
 /// 插入记录；成功时返回 `RETURNING` 映射的行（语句需包含 `RETURNING` 子句）
@@ -35,7 +35,7 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+    let log_sql = log_sql(|| inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder));
 
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values)
@@ -68,7 +68,7 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+    let log_sql = log_sql(|| inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder));
 
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values)
@@ -98,7 +98,7 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+    let log_sql = log_sql(|| inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder));
 
     let start = Instant::now();
     let ret = sqlx::query_with(AssertSqlSafe(sql), values)
@@ -127,7 +127,7 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+    let log_sql = log_sql(|| inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder));
 
     let start = Instant::now();
     let ret = sqlx::query_with(AssertSqlSafe(sql), values)
@@ -139,6 +139,10 @@ where
 }
 
 /// 统计记录数
+///
+/// 会清除传入语句的 select 列、排序与 limit/offset 后执行 `COUNT(*)`
+///
+/// 注：带 `GROUP BY` 的语句不适用（COUNT 按组返回多行，仅取首行）
 ///
 /// # Examples
 ///
@@ -156,12 +160,15 @@ where
 {
     stmt.clear_selects();
     stmt.clear_order_by();
+    // 清除调用方可能设置的 limit/offset：否则 OFFSET > 0 时 COUNT 查询返回零行
+    stmt.reset_limit();
+    stmt.reset_offset();
     // SELECT COUNT(*)
     stmt.expr(Expr::cust("COUNT(*)"));
 
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+    let log_sql = log_sql(|| inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder));
 
     let start = Instant::now();
     let ret: Result<i64, sqlx::Error> = sqlx::query_scalar_with(AssertSqlSafe(sql), values)
@@ -193,7 +200,7 @@ where
     stmt.limit(1);
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+    let log_sql = log_sql(|| inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder));
 
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values)
@@ -224,7 +231,7 @@ where
 {
     let (sql, values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_sql = inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder);
+    let log_sql = log_sql(|| inject_parameters(&sql, &values.0.0, &PostgresQueryBuilder));
 
     let start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(sql), values)
@@ -252,22 +259,25 @@ where
 pub async fn paginate<'e, E, T>(
     db: E,
     mut stmt: SelectStatement,
-    mut page: i32,
-    mut size: i32,
+    page: usize,
+    size: usize,
 ) -> anyhow::Result<(Vec<T>, i64)>
 where
     E: Executor<'e, Database = Postgres> + Copy,
     T: for<'r> FromRow<'r, PgRow> + Send + Unpin,
 {
-    // 构建 count 查询
+    // 构建 count 查询（清除 select 列、排序与调用方可能设置的 limit/offset）
     let mut count = stmt.clone();
     count.clear_selects();
     count.clear_order_by();
+    count.reset_limit();
+    count.reset_offset();
     count.expr(Expr::cust("COUNT(*)"));
 
     let (count_sql, count_values) = count.build_sqlx(PostgresQueryBuilder);
 
-    let log_count_sql = inject_parameters(&count_sql, &count_values.0.0, &PostgresQueryBuilder);
+    let log_count_sql =
+        log_sql(|| inject_parameters(&count_sql, &count_values.0.0, &PostgresQueryBuilder));
 
     let count_start = Instant::now();
     let ret: Result<i64, sqlx::Error> =
@@ -281,18 +291,15 @@ where
         return Ok((Vec::new(), total));
     }
 
-    // 构建分页查询
-    if page <= 0 {
-        page = 1
-    }
-    if size <= 0 {
-        size = 20
-    }
-    stmt.limit(size as u64).offset(((page - 1) * size) as u64);
+    // 构建分页查询（page 从 1 起；0 视为 1，size 0 视为 20）
+    let page = page.max(1) as u64;
+    let size = if size == 0 { 20 } else { size as u64 };
+    stmt.limit(size).offset((page - 1).saturating_mul(size));
 
     let (query_sql, query_values) = stmt.build_sqlx(PostgresQueryBuilder);
 
-    let log_query_sql = inject_parameters(&query_sql, &query_values.0.0, &PostgresQueryBuilder);
+    let log_query_sql =
+        log_sql(|| inject_parameters(&query_sql, &query_values.0.0, &PostgresQueryBuilder));
 
     let query_start = Instant::now();
     let ret = sqlx::query_as_with::<_, T, _>(AssertSqlSafe(query_sql), query_values)

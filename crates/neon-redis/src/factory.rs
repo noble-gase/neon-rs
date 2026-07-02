@@ -20,6 +20,8 @@ pub trait Factory {
 }
 
 /// 单节点 Redis
+///
+/// 注：DSN 列表仅使用**第一个**地址，其余条目忽略；多节点请用 `Cluster`
 pub struct Single;
 
 impl Factory for Single {

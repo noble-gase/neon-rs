@@ -19,6 +19,9 @@ use crate::factory::{Factory, SQL_LOGGER};
 
 /// 注册全局 SQL 日志回调
 ///
+/// 注意：回调收到的 SQL 已注入参数值（便于排查），可能包含密码/PII 等敏感数据，
+/// 脱敏由调用方负责；未注册回调时不构建日志 SQL，无额外开销
+///
 /// # Examples
 ///
 /// ```ignore

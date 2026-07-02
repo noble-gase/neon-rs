@@ -76,6 +76,17 @@ fn trace_sql(sql: String, cost: Duration, err: Option<&anyhow::Error>) {
     }
 }
 
+/// 仅在注册了 SQL 日志回调时才构建日志 SQL（注入参数值）；
+/// 未注册时返回空串，避免热路径上无谓的字符串构建开销
+#[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
+#[inline]
+pub(crate) fn log_sql(build: impl FnOnce() -> String) -> String {
+    if SQL_LOGGER.get().is_none() {
+        return String::new();
+    }
+    build()
+}
+
 /// 包装 insert 结果；唯一约束冲突时返回 [`InsertResult::Duplicate`]
 #[cfg(any(feature = "mysql", feature = "postgres", feature = "sqlite"))]
 pub(crate) fn trace_insert_result<T, R, F>(

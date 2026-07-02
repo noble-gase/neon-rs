@@ -12,6 +12,7 @@ use std::sync::{Arc, OnceLock};
 
 use anyhow::{Context, Result, bail, ensure};
 use libflate::deflate::Decoder as DeflateDecoder;
+use reqwest::StatusCode;
 use reqwest::blocking::Client;
 use reqwest::header::{CONTENT_RANGE, RANGE};
 
@@ -35,16 +36,21 @@ const COMPRESSION_DEFLATE: u16 = 8;
 static HTTP_CLIENT: OnceLock<Arc<Client>> = OnceLock::new();
 
 /// 在首次 HTTP 请求前安装全局客户端（仅可调用一次）
+///
+/// 需要连接自签名证书等特殊环境时，在此显式注入定制客户端（如
+/// `danger_accept_invalid_certs(true)`）；默认客户端始终校验 TLS 证书
 pub fn set_http_client(client: Client) -> Result<()> {
     HTTP_CLIENT
         .set(Arc::new(client))
         .map_err(|_| anyhow::anyhow!("HTTP client already initialized"))
 }
 
-/// 默认 HTTP 客户端：跳过 TLS 证书校验，每主机较多空闲连接（适合大文件分片 Range）
+/// 默认 HTTP 客户端：正常校验 TLS 证书；每主机较多空闲连接（适合大文件分片 Range）
+///
+/// 如需跳过证书校验（自签名证书等），请通过 [`set_http_client`] 显式注入，
+/// 不提供静默跳过校验的默认行为（远程 ZIP 常为 OTA 包等敏感内容，防中间人篡改）
 fn build_default_client() -> Result<Client> {
     Client::builder()
-        .danger_accept_invalid_certs(true)
         .pool_max_idle_per_host(1000)
         .build()
         .context("build HTTP client")
@@ -406,6 +412,10 @@ fn find_signature_tail(haystack: &[u8], signature: &[u8]) -> Option<usize> {
 
 impl ArchiveInner {
     /// `Range: bytes=start-end`（含端点），将响应体读入内存
+    ///
+    /// 仅接受 `206 Partial Content`；若服务器不支持 Range 而返回 `200`，
+    /// 仅当请求自文件头开始（start == 0）时截取前缀兼容，否则报错，
+    /// 避免把整文件当作分片数据解析
     fn fetch_range(&self, start: u64, end: u64) -> Result<Vec<u8>> {
         let response = self
             .client
@@ -413,15 +423,23 @@ impl ArchiveInner {
             .header(RANGE, format!("bytes={start}-{end}"))
             .send()
             .with_context(|| format!("range request bytes={start}-{end}"))?;
-        ensure!(
-            response.status().is_success(),
-            "range request failed: {}",
-            response.status()
-        );
-        Ok(response.bytes().context("read range body")?.to_vec())
+        let status = response.status();
+        let expected = usize::try_from(end - start + 1).context("range too large")?;
+        if status == StatusCode::PARTIAL_CONTENT {
+            return Ok(response.bytes().context("read range body")?.to_vec());
+        }
+        if status.is_success() && start == 0 {
+            // 服务器忽略 Range 返回整文件：请求恰从文件头开始，可安全截取前缀
+            let bytes = response.bytes().context("read full body")?;
+            ensure!(bytes.len() >= expected, "response body shorter than range");
+            return Ok(bytes[..expected].to_vec());
+        }
+        bail!("range request failed: {status}（服务器可能不支持 HTTP Range）");
     }
 
     /// `Range: bytes=start-end`，返回响应体流（用于 Store / Deflate，避免整段进内存）
+    ///
+    /// 状态码语义同 [`Self::fetch_range`]：200 仅在 start == 0 时以 `take` 截取前缀
     fn fetch_range_stream(&self, start: u64, end: u64) -> Result<Box<dyn Read + Send>> {
         let response = self
             .client
@@ -429,12 +447,15 @@ impl ArchiveInner {
             .header(RANGE, format!("bytes={start}-{end}"))
             .send()
             .with_context(|| format!("range stream bytes={start}-{end}"))?;
-        ensure!(
-            response.status().is_success(),
-            "range stream failed: {}",
-            response.status()
-        );
-        Ok(Box::new(response))
+        let status = response.status();
+        if status == StatusCode::PARTIAL_CONTENT {
+            return Ok(Box::new(response));
+        }
+        if status.is_success() && start == 0 {
+            // 服务器忽略 Range 返回整文件：限定读取长度，避免多读后续字节
+            return Ok(Box::new(response.take(end - start + 1)));
+        }
+        bail!("range stream failed: {status}（服务器可能不支持 HTTP Range）");
     }
 }
 

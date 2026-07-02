@@ -1061,7 +1061,7 @@ fn record_byte_size(record: &LogRecord) -> usize {
 /// 单条投递管线运行所需的共享句柄：把它们收进一处，避免在
 /// `run_pipeline` / `drain_into_buf` / `spawn_flush` 之间逐个透传
 struct Pipeline {
-    /// SLS 客户端槽位；STS 刷新时整体替换 `Arc<Client>`，发送任务在派发瞬间取快照。
+    /// SLS 客户端槽位；STS 刷新时整体替换 `Arc<Client>`，发送任务在每次 attempt 前取快照。
     /// 用 [`ArcSwap`] 实现无锁读写，避免每批发送都竞争互斥锁
     client: Arc<ArcSwap<Client>>,
     /// 本 sink 的运行期配置
@@ -1075,11 +1075,6 @@ struct Pipeline {
 }
 
 impl Pipeline {
-    /// 取当前 client 的快照（clone `Arc<Client>`），供单个发送任务在其生命周期内稳定使用
-    fn client_snapshot(&self) -> Arc<Client> {
-        self.client.load_full()
-    }
-
     /// 取走 `batch` 中的日志，组装为 `LogGroup` 并派发一个并发发送任务
     ///
     /// 通过信号量限制 in-flight 请求数：达到上限时 `acquire_owned` 会在此 await，
@@ -1150,8 +1145,9 @@ impl Pipeline {
         // 已拿到许可，取走整批记录，batch 复位以继续累积下一批
         let records = batch.take();
 
-        // 为发送任务克隆所需共享句柄（Arc/watch 克隆都很廉价）；client 取当前快照
-        let client = self.client_snapshot();
+        // 为发送任务克隆所需共享句柄（Arc/watch 克隆都很廉价）；client 传 ArcSwap 槽位，
+        // 使重试跨越 STS 凭据刷新点时也能在下一次 attempt 用上新 client
+        let client = Arc::clone(&self.client);
         let config = Arc::clone(&self.config);
         let dropped = Arc::clone(&self.dropped);
         let pending_records = Arc::clone(&self.pending_records);
@@ -1598,8 +1594,11 @@ fn spawn_credentials_refresh_loop(
 }
 
 /// 发送一批日志，失败按指数退避重试；关闭/超时场景下受 deadline 约束并正确计数
+///
+/// `client` 为 ArcSwap 槽位：每次 attempt 前取一次快照（无锁 load），使重试跨越 STS
+/// 凭据刷新点时能用上新 client；单次 attempt 内始终使用同一快照，请求中途不换 client
 async fn send_with_retry(
-    client: Arc<Client>,
+    client: Arc<ArcSwap<Client>>,
     config: Arc<SlsConfig>,
     records: Vec<LogRecord>,
     count: u64,
@@ -1636,6 +1635,8 @@ async fn send_with_retry(
             }
         };
 
+        // 每次 attempt 前取当前 client 快照：重试期间若 STS 凭据已刷新，本次尝试即用新 client
+        let client = client.load_full();
         // 组装并发起一次 PutLogs 请求
         let send_fut = client
             .put_logs(config.project.as_str(), config.logstore.as_str())

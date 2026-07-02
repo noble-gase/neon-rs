@@ -1,4 +1,8 @@
 //! DES 对称加密（ECB + PKCS#7）
+//!
+//! # 安全提示
+//! 单 DES 密钥仅 56 位，早已可被暴力破解；ECB 模式也不隐藏明文模式。
+//! 本模块**仅用于对接遗留系统（legacy）**，新业务请使用 AES-GCM
 
 use anyhow::anyhow;
 use cipher::{Array, BlockCipherDecrypt, BlockCipherEncrypt, KeyInit, consts::U8};

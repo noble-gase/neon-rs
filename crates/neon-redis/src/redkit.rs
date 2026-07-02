@@ -114,6 +114,11 @@ where
     K: AsRef<str> + Sync,
     T: Serialize + DeserializeOwned,
 {
+    // 空入参直接返回：无参数的 MGET 会被 Redis 拒绝
+    if keys.is_empty() {
+        return Ok(HashMap::new());
+    }
+
     let key_vec: Vec<&str> = keys.iter().map(|k| k.as_ref()).collect();
     let raw: Vec<Option<String>> = conn.mget(key_vec).await?;
 
@@ -137,6 +142,11 @@ where
     C: AsyncCommands,
     K: AsRef<str> + Sync,
 {
+    // 空入参直接返回：无参数的 MGET 会被 Redis 拒绝
+    if keys.is_empty() {
+        return Ok(HashMap::new());
+    }
+
     let key_vec: Vec<&str> = keys.iter().map(|k| k.as_ref()).collect();
     let raw: Vec<Option<String>> = conn.mget(key_vec).await?;
 
@@ -176,6 +186,11 @@ where
     K: AsRef<str> + Sync,
     T: Serialize + DeserializeOwned,
 {
+    // 空入参直接返回：无 field 的 HMGET 会被 Redis 拒绝
+    if fields.is_empty() {
+        return Ok(HashMap::new());
+    }
+
     let field_vec: Vec<&str> = fields.iter().map(|k| k.as_ref()).collect();
     let raw: Vec<Option<String>> = conn.hmget(key.as_ref(), field_vec).await?;
 
@@ -198,6 +213,11 @@ where
     C: AsyncCommands,
     K: AsRef<str> + Sync,
 {
+    // 空入参直接返回：无 field 的 HMGET 会被 Redis 拒绝
+    if fields.is_empty() {
+        return Ok(HashMap::new());
+    }
+
     let field_vec: Vec<&str> = fields.iter().map(|k| k.as_ref()).collect();
     let raw: Vec<Option<String>> = conn.hmget(key.as_ref(), field_vec).await?;
 

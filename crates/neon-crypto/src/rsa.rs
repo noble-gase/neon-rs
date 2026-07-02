@@ -37,6 +37,9 @@ pub struct KeyPair {
 }
 
 /// 生成 PKCS#1 格式的 RSA 密钥对
+///
+/// # 安全提示
+/// 生产环境 `bits` 应不低于 2048（推荐 3072）；1024 位仅适用于测试或兼容遗留系统
 pub fn generate_pkcs1_keypair(bits: usize) -> anyhow::Result<KeyPair> {
     let key = generate_rsa_key(bits)?;
     let private_pem = key
@@ -54,6 +57,9 @@ pub fn generate_pkcs1_keypair(bits: usize) -> anyhow::Result<KeyPair> {
 }
 
 /// 生成 PKCS#8 格式的 RSA 密钥对
+///
+/// # 安全提示
+/// 生产环境 `bits` 应不低于 2048（推荐 3072）；1024 位仅适用于测试或兼容遗留系统
 pub fn generate_pkcs8_keypair(bits: usize) -> anyhow::Result<KeyPair> {
     let key = generate_rsa_key(bits)?;
     let private_pem = key
@@ -142,13 +148,20 @@ fn format_pem(raw: &str, ty: &str) -> String {
     out.push_str("-----BEGIN ");
     out.push_str(ty);
     out.push_str("-----\n");
-    // raw 是 ASCII base64，按字节偏移切割不会破坏 UTF-8 边界
-    let mut i = 0;
-    while i < raw.len() {
-        let end = (i + LINE_LEN).min(raw.len());
-        out.push_str(&raw[i..end]);
+    // 按字符而非字节切行：合法 base64 均为 ASCII，两者等价；若传入含多字节 UTF-8
+    // 的非法内容，按字节切片会在字符边界处 panic，按字符切行则交由后续
+    // PEM 解析报错，不会 panic
+    let mut count = 0;
+    for c in raw.chars() {
+        out.push(c);
+        count += 1;
+        if count == LINE_LEN {
+            out.push('\n');
+            count = 0;
+        }
+    }
+    if count > 0 {
         out.push('\n');
-        i = end;
     }
     out.push_str("-----END ");
     out.push_str(ty);
@@ -502,6 +515,15 @@ mod tests {
         assert!(pem.contains(&format!(
             "-----BEGIN {CERTIFICATE}-----\nMIIB\n-----END {CERTIFICATE}-----\n"
         )));
+    }
+
+    #[test]
+    fn format_pem_non_ascii_does_not_panic() {
+        // 非法（非 ASCII）输入不应 panic，留给后续 PEM 解析报错
+        let raw = "中文非base64内容".repeat(20);
+        let pem = format_public_pem_raw(&raw, PublicPemType::PublicKey);
+        assert!(pem.starts_with(&format!("-----BEGIN {PUBLIC_KEY}-----\n")));
+        assert!(PublicKey::from_pem(pem.as_bytes()).is_err());
     }
 
     #[test]

@@ -18,15 +18,15 @@ pub enum ByteSize {
 }
 
 impl ByteSize {
-    /// 转为字节数
+    /// 转为字节数（极端值饱和而非溢出）
     pub const fn to_bytes(self) -> i64 {
         match self {
             ByteSize::B(n) => n,
-            ByteSize::KiB(n) => n * KB,
-            ByteSize::MiB(n) => n * MB,
-            ByteSize::GiB(n) => n * GB,
-            ByteSize::TiB(n) => n * TB,
-            ByteSize::PiB(n) => n * PB,
+            ByteSize::KiB(n) => n.saturating_mul(KB),
+            ByteSize::MiB(n) => n.saturating_mul(MB),
+            ByteSize::GiB(n) => n.saturating_mul(GB),
+            ByteSize::TiB(n) => n.saturating_mul(TB),
+            ByteSize::PiB(n) => n.saturating_mul(PB),
         }
     }
 

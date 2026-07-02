@@ -323,6 +323,15 @@ struct RemoteHandle {
     reload_worker: tokio::task::JoinHandle<()>,
 }
 
+impl Drop for RemoteHandle {
+    /// 兜底：未显式调用 [`NacosConfig::shutdown`] 就直接 drop 时，中止热更新 worker，
+    /// 避免后台任务与其持有的 `ReloadListener` 泄漏（监听器的异步移除无法在 Drop
+    /// 中完成，由 `ConfigService` 随连接释放兜底）；已结束的任务重复 abort 无副作用
+    fn drop(&mut self) {
+        self.reload_worker.abort();
+    }
+}
+
 /// Nacos 配置
 ///
 /// 内部以 [`tokio::sync::watch`] 通道保存最新的 [`config::Config`]：读取廉价、且支持订阅热更新
@@ -425,7 +434,7 @@ impl NacosConfig {
 
     /// 移除 nacos 监听器并释放远程连接；调用后仍可通过 [`Self::get`] 读取最后快照
     pub async fn shutdown(&mut self) -> Result<()> {
-        let Some(remote) = self.remote.take() else {
+        let Some(mut remote) = self.remote.take() else {
             return Ok(());
         };
         let mut first_error = None;
@@ -445,7 +454,7 @@ impl NacosConfig {
                 }
             }
         }
-        abort_reload_worker(remote.reload_worker).await;
+        abort_reload_worker(&mut remote.reload_worker).await;
         tracing::info!(data_ids = ?remote.data_ids, "nacos 配置监听器已移除");
         if let Some(err) = first_error {
             Err(err)
@@ -632,7 +641,7 @@ impl ConfigBuilder {
             update_notify: Arc::new(Notify::new()),
         });
         let worker_listener = listener.clone();
-        let reload_worker = tokio::spawn(async move {
+        let mut reload_worker = tokio::spawn(async move {
             run_reload_worker(worker_listener).await;
         });
         let listener_trait: Arc<dyn ConfigChangeListener> = listener;
@@ -656,7 +665,7 @@ impl ConfigBuilder {
                     &registered_data_ids,
                 )
                 .await;
-                abort_reload_worker(reload_worker).await;
+                abort_reload_worker(&mut reload_worker).await;
                 return Err(err);
             }
             registered_data_ids.push(data_id.clone());
@@ -815,9 +824,9 @@ fn restore_entry(
     }
 }
 
-async fn abort_reload_worker(reload_worker: tokio::task::JoinHandle<()>) {
+async fn abort_reload_worker(reload_worker: &mut tokio::task::JoinHandle<()>) {
     reload_worker.abort();
-    let _ = reload_worker.await;
+    let _ = (&mut *reload_worker).await;
 }
 
 async fn cleanup_registered_listeners(

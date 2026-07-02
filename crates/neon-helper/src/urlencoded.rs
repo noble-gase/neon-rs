@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 /// 将键值对序列编码为 URL query（保留顺序，同一 key 可多次出现）
-pub fn encode<K, V>(pairs: &Vec<(K, V)>) -> String
+pub fn encode<K, V>(pairs: &[(K, V)]) -> String
 where
     K: AsRef<str>,
     V: AsRef<str>,

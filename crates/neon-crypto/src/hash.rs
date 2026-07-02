@@ -66,6 +66,9 @@ pub fn hmac_sha256<T: HashOutput>(
 }
 
 /// 使用指定 `Digest` 算法计算 HMAC
+///
+/// 注：HMAC 规范本身允许空 key，本库为避免误用（如未初始化的密钥变量）
+/// 主动拒绝空 key；对接方若依赖空 key 行为需自行处理
 pub fn hmac<D, T>(key: impl AsRef<[u8]>, data: impl AsRef<[u8]>) -> anyhow::Result<T>
 where
     D: Digest + digest::block_api::BlockSizeUser,

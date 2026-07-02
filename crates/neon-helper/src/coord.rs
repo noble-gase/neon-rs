@@ -231,15 +231,16 @@ impl GeoTransform {
         }
 
         let mut bf0 = y / ep.a0;
-        loop {
+        // 正常输入数次内收敛；设上限防 NaN/无穷大输入下永不收敛导致死循环
+        for _ in 0..100 {
             let y0 = -ep.a2 * (2.0 * bf0).sin() / 2.0 + ep.a4 * (4.0 * bf0).sin() / 4.0
                 - ep.a6 * (6.0 * bf0).sin() / 6.0;
             let bf = (y - y0) / ep.a0;
-            if (bf - bf0).abs() <= INV_A0_EPS {
-                bf0 = bf;
+            let converged = (bf - bf0).abs() <= INV_A0_EPS;
+            bf0 = bf;
+            if converged {
                 break;
             }
-            bf0 = bf;
         }
 
         let sin_bf = bf0.sin();

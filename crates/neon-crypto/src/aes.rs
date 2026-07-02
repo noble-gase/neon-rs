@@ -1,4 +1,13 @@
 //! AES 对称加密（CBC / ECB / GCM）
+//!
+//! # 模式选择与安全提示
+//!
+//! - **新业务优先使用 GCM**（自带认证，防篡改）
+//! - **CBC 密文不含认证**：若解密错误可被调用方/攻击者区分，存在 padding
+//!   oracle 风险；需要完整性时请另行 encrypt-then-MAC，或直接改用 GCM
+//! - **ECB 不隐藏明文模式，不具备语义安全**，仅用于对接遗留系统（legacy）
+//! - **GCM 的 nonce 在同一 key 下绝不可重复**：nonce 重用会泄漏认证密钥，
+//!   导致伪造攻击；调用方需自行保证 nonce 唯一（随机生成或计数器）
 
 use aes::{Aes128, Aes192, Aes256};
 use aes_gcm::aead::{Aead, KeyInit, Payload};
@@ -191,6 +200,10 @@ where
 // --------- ECB ---------
 
 /// AES-ECB 加密（PKCS#7）
+///
+/// # 安全提示
+/// ECB 不隐藏明文模式（相同明文块 → 相同密文块），仅用于对接遗留系统；
+/// 新业务请使用 [`aes_encrypt_gcm`]
 pub fn aes_encrypt_ecb(
     key: impl AsRef<[u8]>,
     data: impl AsRef<[u8]>,
@@ -273,6 +286,10 @@ impl Default for GcmOption {
 }
 
 /// AES-GCM 加密；默认 NonceSize=12，TagSize=16
+///
+/// # 安全提示
+/// 同一 key 下 `nonce` 绝不可重复（重用会泄漏认证密钥、导致伪造攻击），
+/// 调用方需保证 nonce 唯一（随机生成或单调计数器）
 pub fn aes_encrypt_gcm(
     key: impl AsRef<[u8]>,
     nonce: impl AsRef<[u8]>,
