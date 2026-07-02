@@ -57,9 +57,11 @@ cargo add neon-rs --features "crypto,macros,redis,sql-mysql"
 ```rust
 use neon::config::nacos::{DEFAULT_ENV_VAR, Env, NacosConfig, NacosSource};
 
+let source = NacosSource::new("127.0.0.1:8848", "").data_id("app.toml");
+
 let cfg = NacosConfig::builder()
     .local_file("config/app.local.toml")
-    .nacos(NacosSource::new("127.0.0.1:8848", "").data_id("app.toml"))
+    .nacos(source)
     .build(Env::from_var(DEFAULT_ENV_VAR))
     .await?;
 
@@ -71,10 +73,15 @@ let port = cfg.get_int("server.port")?;
 启用 `log` 或 `log-sls` 后，通过 `neon::log::sls` 接入 tracing Layer，业务线程几乎零阻塞。详见 [`neon-log` 模块文档](crates/neon-log/src/sls/mod.rs)。
 
 ```rust
-use neon::log::sls::{SlsConfig, build};
+use neon::log::sls::{SlsConfig, StaticCredentialsProvider, build};
 
-let config = SlsConfig::new(endpoint, ak_id, ak_secret, project, logstore);
-let (sls_layer, _guard) = build(config)?;
+let config = SlsConfig::new(
+    endpoint,
+    project,
+    logstore,
+    StaticCredentialsProvider::new(ak_id, ak_secret),
+);
+let (sls_layer, _guard) = build(config).expect("init sls layer");
 // _guard 须持有到进程结束
 ```
 
