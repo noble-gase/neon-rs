@@ -23,15 +23,21 @@ impl AsyncSingle {
     /// 默认配置初始化
     pub async fn new(url: &str) -> RedisResult<Self> {
         let client = Client::open(url)?;
-        let manager = client.get_connection_manager().await?;
+
+        let mut manager = client.get_connection_manager().await?;
+        redis::cmd("PING").query_async::<()>(&mut manager).await?;
+
         Ok(Self { client, manager })
     }
 
     /// 使用 crate 的 `ConnOptions` 初始化（自定义重连/超时配置）
     pub async fn with_options(url: &str, opt: &ConnOptions) -> RedisResult<Self> {
         let client = Client::open(url)?;
-        let manager =
+
+        let mut manager =
             ConnectionManager::new_with_config(client.clone(), opt.to_manager_config()).await?;
+        redis::cmd("PING").query_async::<()>(&mut manager).await?;
+
         Ok(Self { client, manager })
     }
 
@@ -75,14 +81,20 @@ impl AsyncCluster {
     /// 初始化。nodes 只需给集群中任意一个或多个种子节点
     pub async fn new(nodes: Vec<String>) -> RedisResult<Self> {
         let client = ClusterClient::new(nodes)?;
-        let conn = client.get_async_connection().await?;
+
+        let mut conn = client.get_async_connection().await?;
+        redis::cmd("PING").query_async::<()>(&mut conn).await?;
+
         Ok(Self { client, conn })
     }
 
     /// 使用 crate 的 `ConnOptions` 初始化（映射重试次数、连接/响应超时）
     pub async fn with_options(nodes: Vec<String>, opt: &ConnOptions) -> RedisResult<Self> {
         let client = opt.to_cluster_builder(nodes).build()?;
-        let conn = client.get_async_connection().await?;
+
+        let mut conn = client.get_async_connection().await?;
+        redis::cmd("PING").query_async::<()>(&mut conn).await?;
+
         Ok(Self { client, conn })
     }
 
