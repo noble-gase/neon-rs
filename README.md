@@ -109,7 +109,7 @@ pub struct User {
     #[sqlx(rename = "username")]
     pub name: String,
 
-    pub age: i8
+    pub age: i8,
     pub email: String,
     pub phone: String,
 }
