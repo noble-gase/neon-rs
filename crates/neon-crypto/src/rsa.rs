@@ -242,7 +242,7 @@ impl PrivateKey {
         use rsa::pkcs1v15::SigningKey;
         let mut rng = rand::rng();
         Ok(SigningKey::<D>::new(self.key.clone())
-            .sign_with_rng(&mut rng, data.as_ref())
+            .try_sign_with_rng(&mut rng, data.as_ref())?
             .to_vec())
     }
 
@@ -251,7 +251,7 @@ impl PrivateKey {
         use rsa::pkcs1v15::SigningKey;
         let mut rng = rand::rng();
         Ok(SigningKey::<Md5>::new_unprefixed(self.key.clone())
-            .sign_with_rng(&mut rng, data.as_ref())
+            .try_sign_with_rng(&mut rng, data.as_ref())?
             .to_vec())
     }
 
@@ -276,7 +276,7 @@ impl PrivateKey {
         let mut rng = rand::rng();
         Ok(
             SigningKey::<D>::new_with_salt_len(self.key.clone(), salt_len)
-                .sign_with_rng(&mut rng, data.as_ref())
+                .try_sign_with_rng(&mut rng, data.as_ref())?
                 .to_vec(),
         )
     }
