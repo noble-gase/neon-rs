@@ -56,7 +56,7 @@ type Aes192CbcDec = cbc::Decryptor<Aes192>;
 type Aes256CbcEnc = cbc::Encryptor<Aes256>;
 type Aes256CbcDec = cbc::Decryptor<Aes256>;
 
-// --------- CBC ---------
+// --------------------------- CBC ---------------------------
 
 /// AES-CBC 加密（PKCS#7 padding，默认 padding 边界为 block_size=16，可自定义为更大的倍数）
 ///
@@ -197,7 +197,7 @@ where
     dec.decrypt_blocks(blocks);
 }
 
-// --------- ECB ---------
+// --------------------------- ECB ---------------------------
 
 /// AES-ECB 加密（PKCS#7）
 ///
@@ -263,7 +263,7 @@ pub fn aes_decrypt_ecb(
     Ok(out)
 }
 
-// --------- GCM ---------
+// --------------------------- GCM ---------------------------
 
 /// AES-GCM 选项
 ///

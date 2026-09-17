@@ -55,7 +55,7 @@ aes = [
     "dep:rand",
     "dep:base64",
 ]
-des = ["dep:des", "dep:cipher", "dep:base64"]
+des = ["dep:des", "dep:cbc", "dep:cipher", "dep:base64"]
 rsa = [
     "dep:rsa",
     "dep:pkcs1",
