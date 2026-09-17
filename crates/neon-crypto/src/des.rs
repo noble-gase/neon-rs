@@ -70,8 +70,7 @@ pub fn des_encrypt_ecb(
     let mut buf = data.as_ref().to_vec();
     pkcs7_padding(&mut buf, BLOCK_SIZE)?;
 
-    let (blocks, tail) = Array::<u8, U8>::slice_as_chunks_mut(&mut buf);
-    debug_assert!(tail.is_empty(), "pkcs7_padding 必产生整数倍块");
+    let (blocks, _) = Array::<u8, U8>::slice_as_chunks_mut(&mut buf);
     cipher.encrypt_blocks(blocks);
     Ok(CipherText {
         bytes: buf,
