@@ -23,13 +23,23 @@ pub fn expand_sqlx_model(input: TokenStream) -> TokenStream {
         if attr.path().is_ident("model") {
             match attr.parse_args::<PartialAttr>() {
                 Ok(p) => {
+                    if fields.iter().any(|f| f.ident.is_none()) {
+                        return syn::Error::new_spanned(
+                            &input.ident,
+                            "Model can only be derived for structs with named fields",
+                        )
+                        .to_compile_error();
+                    }
                     let target_ident = &p.target;
 
                     // 根据 include/exclude 模式筛选字段
                     let keep_fields: Vec<_> = fields
                         .iter()
                         .filter(|f| {
-                            let ident = f.ident.as_ref().unwrap();
+                            let ident = f
+                                .ident
+                                .as_ref()
+                                .expect("fields are checked to be named above");
                             if p.exclude {
                                 !p.fields.iter().any(|ex| ex == ident)
                             } else {
@@ -40,7 +50,10 @@ pub fn expand_sqlx_model(input: TokenStream) -> TokenStream {
 
                     // 生成字段定义（保留属性）
                     let gen_fields = keep_fields.iter().map(|f| {
-                        let ident = f.ident.as_ref().unwrap();
+                        let ident = f
+                            .ident
+                            .as_ref()
+                            .expect("fields are checked to be named above");
                         let ty = &f.ty;
                         let attrs = &f.attrs;
                         quote! {
@@ -180,6 +193,26 @@ mod tests {
 
         assert!(out.contains("compile_error"));
         assert!(out.contains("can only be derived for structs"));
+    }
+
+    #[test]
+    fn tuple_struct_input_produces_compile_error() {
+        let out = expand(quote! {
+            #[model(Foo(id))]
+            pub struct Demo(i64, String);
+        });
+
+        assert!(out.contains("compile_error"));
+        assert!(out.contains("structs with named fields"));
+    }
+
+    #[test]
+    fn tuple_struct_without_model_attrs_produces_empty_output() {
+        let out = expand(quote! {
+            pub struct Demo(i64);
+        });
+
+        assert!(out.trim().is_empty());
     }
 
     #[test]

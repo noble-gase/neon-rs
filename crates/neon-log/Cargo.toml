@@ -1,6 +1,6 @@
 [package]
 name = "neon-log"
-version = "0.2.1"
+version = "0.2.2"
 edition = { workspace = true }
 description = "log toolkit"
 license = "MIT"
@@ -33,3 +33,6 @@ sls = [
     "dep:arc-swap",
     "dep:crossbeam-queue",
 ]
+
+[lints]
+workspace = true

@@ -16,9 +16,9 @@ impl Env {
     pub fn from_name(name: &str) -> Self {
         let name = name.trim();
         if name.is_empty() || name.eq_ignore_ascii_case("local") {
-            Env::Local
+            Self::Local
         } else {
-            Env::Remote(name.to_string())
+            Self::Remote(name.to_string())
         }
     }
 
@@ -26,20 +26,20 @@ impl Env {
     pub fn from_var(var: &str) -> Self {
         match std::env::var(var) {
             Ok(value) => Self::from_name(&value),
-            Err(_) => Env::Local,
+            Err(_) => Self::Local,
         }
     }
 
     /// 是否为本地环境
     pub fn is_local(&self) -> bool {
-        matches!(self, Env::Local)
+        matches!(self, Self::Local)
     }
 
     /// 环境名称（本地环境固定返回 `local`）
     pub fn name(&self) -> &str {
         match self {
-            Env::Local => "local",
-            Env::Remote(name) => name,
+            Self::Local => "local",
+            Self::Remote(name) => name,
         }
     }
 }

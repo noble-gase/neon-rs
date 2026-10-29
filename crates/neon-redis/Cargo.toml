@@ -1,6 +1,6 @@
 [package]
 name = "neon-redis"
-version = "0.2.3"
+version = "0.2.4"
 edition = { workspace = true }
 description = "redis toolkit"
 license = "MIT"
@@ -32,3 +32,6 @@ sync-lock = ["dep:r2d2", "redis/r2d2"]
 tls-rustls = ["redis/tokio-rustls-comp"]
 tls-rustls-insecure = ["tls-rustls", "redis/tls-rustls-insecure"]
 tls-native-tls = ["redis/tokio-native-tls-comp"]
+
+[lints]
+workspace = true

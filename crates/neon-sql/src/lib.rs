@@ -134,7 +134,7 @@ impl<T> InsertResult<T> {
 #[inline]
 pub fn is_unique_violation(err: &sqlx::Error) -> bool {
     err.as_database_error()
-        .is_some_and(|db| db.is_unique_violation())
+        .is_some_and(sqlx::error::DatabaseError::is_unique_violation)
 }
 
 /// 判断 `anyhow::Error` 内层是否为唯一约束冲突
@@ -164,7 +164,7 @@ mod tests {
                     println!("sql: {sql}, cost: {}ms", cost.as_millis());
                 }
             }
-        })
+        });
     }
 
     #[test]

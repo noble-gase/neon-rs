@@ -54,12 +54,12 @@ impl Format {
 impl From<Format> for config::FileFormat {
     fn from(format: Format) -> Self {
         match format {
-            Format::Yaml => config::FileFormat::Yaml,
-            Format::Toml => config::FileFormat::Toml,
-            Format::Json => config::FileFormat::Json,
-            Format::Json5 => config::FileFormat::Json5,
-            Format::Ini => config::FileFormat::Ini,
-            Format::Ron => config::FileFormat::Ron,
+            Format::Yaml => Self::Yaml,
+            Format::Toml => Self::Toml,
+            Format::Json => Self::Json,
+            Format::Json5 => Self::Json5,
+            Format::Ini => Self::Ini,
+            Format::Ron => Self::Ron,
         }
     }
 }

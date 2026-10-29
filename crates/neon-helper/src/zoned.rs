@@ -45,10 +45,10 @@ pub enum UnixTime {
 impl UnixTime {
     fn to_timestamp(self) -> anyhow::Result<Timestamp> {
         match self {
-            UnixTime::Sec(v) => Timestamp::from_second(v).map_err(anyhow::Error::from),
-            UnixTime::Milli(v) => Timestamp::from_millisecond(v).map_err(anyhow::Error::from),
-            UnixTime::Micro(v) => Timestamp::from_microsecond(v).map_err(anyhow::Error::from),
-            UnixTime::Nano(v) => Timestamp::from_nanosecond(v).map_err(anyhow::Error::from),
+            Self::Sec(v) => Timestamp::from_second(v).map_err(anyhow::Error::from),
+            Self::Milli(v) => Timestamp::from_millisecond(v).map_err(anyhow::Error::from),
+            Self::Micro(v) => Timestamp::from_microsecond(v).map_err(anyhow::Error::from),
+            Self::Nano(v) => Timestamp::from_nanosecond(v).map_err(anyhow::Error::from),
         }
     }
 }

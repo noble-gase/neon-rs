@@ -72,7 +72,7 @@ pub(crate) static SQL_LOGGER: OnceLock<Logger> = OnceLock::new();
 #[inline]
 fn trace_sql(sql: String, cost: Duration, err: Option<&anyhow::Error>) {
     if let Some(logger) = SQL_LOGGER.get() {
-        logger(sql, cost, err)
+        logger(sql, cost, err);
     }
 }
 

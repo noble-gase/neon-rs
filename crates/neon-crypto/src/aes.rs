@@ -44,7 +44,7 @@ impl AesKey {
             32 => Aes256::new_from_slice(key)
                 .map(AesKey::K256)
                 .map_err(anyhow::Error::from),
-            n => Err(anyhow!("invalid AES key size: {}", n)),
+            n => Err(anyhow!("invalid AES key size: {n}")),
         }
     }
 }
@@ -88,7 +88,7 @@ fn cbc_encrypt_pkcs7(key: &[u8], iv: &[u8], data: &[u8]) -> anyhow::Result<Vec<u
         16 => Ok(Aes128CbcEnc::new_from_slices(key, iv)?.encrypt_padded_vec::<Pkcs7>(data)),
         24 => Ok(Aes192CbcEnc::new_from_slices(key, iv)?.encrypt_padded_vec::<Pkcs7>(data)),
         32 => Ok(Aes256CbcEnc::new_from_slices(key, iv)?.encrypt_padded_vec::<Pkcs7>(data)),
-        n => Err(anyhow!("invalid AES key size: {}", n)),
+        n => Err(anyhow!("invalid AES key size: {n}")),
     }
 }
 
@@ -109,7 +109,7 @@ fn cbc_encrypt_padded(
         16 => cbc_encrypt_blocks_in_place(Aes128CbcEnc::new_from_slices(key, iv)?, &mut buf),
         24 => cbc_encrypt_blocks_in_place(Aes192CbcEnc::new_from_slices(key, iv)?, &mut buf),
         32 => cbc_encrypt_blocks_in_place(Aes256CbcEnc::new_from_slices(key, iv)?, &mut buf),
-        n => return Err(anyhow!("invalid AES key size: {}", n)),
+        n => return Err(anyhow!("invalid AES key size: {n}")),
     }
     Ok(buf)
 }
@@ -160,7 +160,7 @@ fn cbc_decrypt_pkcs7(key: &[u8], iv: &[u8], data: &[u8]) -> anyhow::Result<Vec<u
         32 => Aes256CbcDec::new_from_slices(key, iv)?
             .decrypt_padded_vec::<Pkcs7>(data)
             .map_err(|e| anyhow!("cbc decrypt: {e}")),
-        n => Err(anyhow!("invalid AES key size: {}", n)),
+        n => Err(anyhow!("invalid AES key size: {n}")),
     }
 }
 
@@ -183,7 +183,7 @@ fn cbc_decrypt_padded(
         16 => cbc_decrypt_blocks_in_place(Aes128CbcDec::new_from_slices(key, iv)?, &mut out),
         24 => cbc_decrypt_blocks_in_place(Aes192CbcDec::new_from_slices(key, iv)?, &mut out),
         32 => cbc_decrypt_blocks_in_place(Aes256CbcDec::new_from_slices(key, iv)?, &mut out),
-        n => return Err(anyhow!("invalid AES key size: {}", n)),
+        n => return Err(anyhow!("invalid AES key size: {n}")),
     }
     pkcs7_unpadding(&mut out, pad_size)?;
     Ok(out)
@@ -365,7 +365,7 @@ fn gcm_op(call: GcmCall<'_>, nonce_size: usize, tag_size: usize) -> anyhow::Resu
         16 => gcm_dispatch_nonce::<Aes128>(call, nonce_size, tag_size),
         24 => gcm_dispatch_nonce::<Aes192>(call, nonce_size, tag_size),
         32 => gcm_dispatch_nonce::<Aes256>(call, nonce_size, tag_size),
-        n => Err(anyhow!("invalid AES key size: {}", n)),
+        n => Err(anyhow!("invalid AES key size: {n}")),
     }
 }
 

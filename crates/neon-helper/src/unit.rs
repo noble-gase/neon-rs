@@ -21,12 +21,12 @@ impl ByteSize {
     /// 转为字节数（极端值饱和而非溢出）
     pub const fn to_bytes(self) -> i64 {
         match self {
-            ByteSize::B(n) => n,
-            ByteSize::KiB(n) => n.saturating_mul(KB),
-            ByteSize::MiB(n) => n.saturating_mul(MB),
-            ByteSize::GiB(n) => n.saturating_mul(GB),
-            ByteSize::TiB(n) => n.saturating_mul(TB),
-            ByteSize::PiB(n) => n.saturating_mul(PB),
+            Self::B(n) => n,
+            Self::KiB(n) => n.saturating_mul(KB),
+            Self::MiB(n) => n.saturating_mul(MB),
+            Self::GiB(n) => n.saturating_mul(GB),
+            Self::TiB(n) => n.saturating_mul(TB),
+            Self::PiB(n) => n.saturating_mul(PB),
         }
     }
 

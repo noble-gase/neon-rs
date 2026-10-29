@@ -1,6 +1,6 @@
 [package]
 name = "neon-config"
-version = "0.2.1"
+version = "0.2.2"
 edition = { workspace = true }
 description = "config toolkit"
 license = "MIT"
@@ -30,3 +30,6 @@ nacos = [
     "nacos-sdk/auth-by-http",
     "nacos-sdk/auth-by-aliyun",
 ]
+
+[lints]
+workspace = true

@@ -33,7 +33,7 @@ mod tests {
     fn test_nonce() {
         let nonce = nonce(32);
         assert_eq!(nonce.len(), 32);
-        println!("nonce: {}", nonce);
+        println!("nonce: {nonce}");
     }
 
     #[test]
@@ -57,7 +57,7 @@ mod tests {
     fn test_nonce_bytes() {
         let bytes = nonce_bytes(32);
         assert_eq!(bytes.len(), 32);
-        println!("nonce_bytes: {:?}", bytes);
+        println!("nonce_bytes: {bytes:?}");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 [package]
 name = "neon-rs"
-version = "0.2.3"
+version = "0.2.4"
 edition = { workspace = true }
 authors = ["ShengHui <847713844@qq.com>"]
 keywords = ["crypto", "hash", "redis", "redlock", "sql"]
@@ -16,6 +16,21 @@ members = ["crates/*"]
 edition = "2024"
 rust-version = "1.94"
 repository = "https://github.com/noble-gase/neon-rs"
+
+[workspace.lints.clippy]
+cast_lossless = "warn"
+duration_suboptimal_units = "warn"
+explicit_iter_loop = "warn"
+ignored_unit_patterns = "warn"
+implicit_clone = "warn"
+manual_let_else = "warn"
+manual_string_new = "warn"
+match_same_arms = "warn"
+needless_raw_string_hashes = "warn"
+redundant_clone = "warn"
+redundant_closure_for_method_calls = "warn"
+semicolon_if_nothing_returned = "warn"
+uninlined_format_args = "warn"
 
 [workspace.dependencies]
 neon-core = { path = "crates/neon-core", version = "0" }
@@ -130,3 +145,6 @@ sql = ["dep:neon-sql", "neon-sql/mysql", "neon-sql/postgres", "neon-sql/sqlite"]
 sql-mysql = ["dep:neon-sql", "neon-sql/mysql"]
 sql-postgres = ["dep:neon-sql", "neon-sql/postgres"]
 sql-sqlite = ["dep:neon-sql", "neon-sql/sqlite"]
+
+[lints]
+workspace = true

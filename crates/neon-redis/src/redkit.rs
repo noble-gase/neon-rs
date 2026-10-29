@@ -4,12 +4,12 @@ use redis::{AsyncCommands, RedisResult};
 use serde::{Serialize, de::DeserializeOwned};
 
 /// Hash 字段写入脚本：若 key 无 TTL 则设置过期时间（用于 `hget_or_set`）
-const HSET: &str = r#"
+const HSET: &str = r"
 redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
 if redis.call('TTL', KEYS[1]) == -1 then
     redis.call('EXPIRE', KEYS[1], ARGV[3])
 end
-"#;
+";
 
 /// 读取 string key；miss 时调用 `loader`，命中后可选写入 Redis
 ///
@@ -45,7 +45,7 @@ where
             None => conn.set(key, &json_str).await,
         };
         if let Err(e) = ret_get {
-            tracing::error!(error = ?e, key = key, data = json_str, "[redkit::get_or_set] set data failed")
+            tracing::error!(error = ?e, key = key, data = json_str, "[redkit::get_or_set] set data failed");
         }
     }
 
@@ -95,7 +95,7 @@ where
             None => conn.hset(key, field, &json_str).await,
         };
         if let Err(e) = ret_get {
-            tracing::error!(error = ?e, key = key, data = json_str, "[redkit::hget_or_set] set data failed")
+            tracing::error!(error = ?e, key = key, data = json_str, "[redkit::hget_or_set] set data failed");
         }
     }
 
@@ -119,7 +119,7 @@ where
         return Ok(HashMap::new());
     }
 
-    let key_vec: Vec<&str> = keys.iter().map(|k| k.as_ref()).collect();
+    let key_vec: Vec<&str> = keys.iter().map(AsRef::as_ref).collect();
     let raw: Vec<Option<String>> = conn.mget(key_vec).await?;
 
     let mut map = HashMap::with_capacity(keys.len());
@@ -147,7 +147,7 @@ where
         return Ok(HashMap::new());
     }
 
-    let key_vec: Vec<&str> = keys.iter().map(|k| k.as_ref()).collect();
+    let key_vec: Vec<&str> = keys.iter().map(AsRef::as_ref).collect();
     let raw: Vec<Option<String>> = conn.mget(key_vec).await?;
 
     let mut map = HashMap::with_capacity(keys.len());
@@ -191,7 +191,7 @@ where
         return Ok(HashMap::new());
     }
 
-    let field_vec: Vec<&str> = fields.iter().map(|k| k.as_ref()).collect();
+    let field_vec: Vec<&str> = fields.iter().map(AsRef::as_ref).collect();
     let raw: Vec<Option<String>> = conn.hmget(key.as_ref(), field_vec).await?;
 
     let mut map = HashMap::with_capacity(fields.len());
@@ -218,7 +218,7 @@ where
         return Ok(HashMap::new());
     }
 
-    let field_vec: Vec<&str> = fields.iter().map(|k| k.as_ref()).collect();
+    let field_vec: Vec<&str> = fields.iter().map(AsRef::as_ref).collect();
     let raw: Vec<Option<String>> = conn.hmget(key.as_ref(), field_vec).await?;
 
     let mut map = HashMap::with_capacity(fields.len());
@@ -250,6 +250,23 @@ mod tests {
         name: String,
     }
 
+    /// 泛型签名未约束 `Send`，但传入 `Send` 的具体类型时返回的 future 必须是 `Send`，
+    /// 才能在 `tokio::spawn` 中使用
+    #[test]
+    fn or_set_futures_are_send_for_send_inputs() {
+        fn assert_send<T: Send>(_: &T) {}
+
+        async fn loader() -> anyhow::Result<Option<Demo>> {
+            Ok(None)
+        }
+
+        #[expect(dead_code, reason = "compile-time check only")]
+        fn check(conn: &mut redis::aio::ConnectionManager) {
+            assert_send(&get_or_set(&mut *conn, "k", loader, None));
+            assert_send(&hget_or_set(conn, "k", "f", loader, None));
+        }
+    }
+
     #[tokio::test]
     #[ignore = "requires local Redis at redis://127.0.0.1:6379"]
     async fn test_get_or_set() {
@@ -271,10 +288,10 @@ mod tests {
         )
         .await
         .unwrap();
-        println!(">> {:#?}", ret);
+        println!(">> {ret:#?}");
 
         let s: String = client.conn().get("hello").await.unwrap();
-        println!(">> {}", s);
+        println!(">> {s}");
 
         let _: RedisResult<()> = client.conn().del("hello").await;
     }
@@ -301,10 +318,10 @@ mod tests {
         )
         .await
         .unwrap();
-        println!(">> {:#?}", ret);
+        println!(">> {ret:#?}");
 
         let s: String = client.conn().hget("foo", "bar").await.unwrap();
-        println!(">> {}", s);
+        println!(">> {s}");
 
         let _: RedisResult<()> = client.conn().del("foo").await;
     }
@@ -329,7 +346,7 @@ mod tests {
             mget_map(&mut client.conn(), &["foo", "bar", "hello", "none"])
                 .await
                 .unwrap();
-        println!(">> {:#?}", ret);
+        println!(">> {ret:#?}");
 
         let _: RedisResult<()> = client.conn().del(&["foo", "bar", "hello"]).await;
     }
@@ -354,7 +371,7 @@ mod tests {
             mget_str_map(&mut client.conn(), &["foo", "bar", "hello", "none"])
                 .await
                 .unwrap();
-        println!(">> {:#?}", ret);
+        println!(">> {ret:#?}");
 
         let _: RedisResult<()> = client.conn().del(&["foo", "bar", "hello"]).await;
     }
@@ -379,7 +396,7 @@ mod tests {
             .await;
 
         let ret: HashMap<String, Demo> = hgetall(&mut client.conn(), "test").await.unwrap();
-        println!(">> {:#?}", ret);
+        println!(">> {ret:#?}");
 
         let _: RedisResult<()> = client.conn().del("test").await;
     }
@@ -407,7 +424,7 @@ mod tests {
             hmget_map(&mut client.conn(), "test", &["foo", "bar", "hello", "none"])
                 .await
                 .unwrap();
-        println!(">> {:#?}", ret);
+        println!(">> {ret:#?}");
 
         let _: RedisResult<()> = client.conn().del("test").await;
     }
@@ -435,7 +452,7 @@ mod tests {
             hmget_str_map(&mut client.conn(), "test", &["foo", "bar", "hello", "none"])
                 .await
                 .unwrap();
-        println!(">> {:#?}", ret);
+        println!(">> {ret:#?}");
 
         let _: RedisResult<()> = client.conn().del("test").await;
     }

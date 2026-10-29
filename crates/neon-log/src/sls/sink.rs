@@ -34,7 +34,7 @@ const MIN_CREDENTIALS_REFRESH_INTERVAL: Duration = Duration::from_secs(60);
 /// STS 凭据已临期/过期时的快速刷新间隔，避免继续使用即将失效的 client
 const URGENT_CREDENTIALS_REFRESH_INTERVAL: Duration = Duration::from_secs(1);
 /// STS 凭据「提前刷新量」的默认值：凭据带有效期时，在其到期前该时长触发刷新
-const DEFAULT_CREDENTIALS_REFRESH_AHEAD: Duration = Duration::from_secs(5 * 60);
+const DEFAULT_CREDENTIALS_REFRESH_AHEAD: Duration = Duration::from_mins(5);
 /// 默认不重试的 HTTP 状态码：参数非法(400)与资源不存在(404)重试无意义
 const DEFAULT_NO_RETRY_STATUS: &[u32] = &[400, 404];
 /// 定时冲刷间隔的默认值
@@ -550,7 +550,7 @@ pub struct DropSnapshot {
 
 impl DropSnapshot {
     /// 把另一份快照逐项累加进自身，供多 sink 聚合统计复用
-    pub(crate) fn merge(&mut self, other: &DropSnapshot) {
+    pub(crate) fn merge(&mut self, other: &Self) {
         self.total += other.total;
         self.queue_full += other.queue_full;
         self.worker_closed += other.worker_closed;
@@ -719,7 +719,7 @@ impl SlsSink {
         index: usize,
         level_tag: &str,
         config: SlsConfig,
-    ) -> Result<(SlsSink, SinkHandle), SlsBuildError> {
+    ) -> Result<(Self, SinkHandle), SlsBuildError> {
         // 先规整配置，确保后续所有数值都落在有效范围
         let config = config.normalized();
         // 从凭据提供器取一组初始凭据并据此构建 client，任一步失败直接上抛
@@ -754,12 +754,12 @@ impl SlsSink {
                     shutdown_rx,
                     done_tx,
                     worker_dropped,
-                )
+                );
             })
             .map_err(SlsBuildError::WorkerThread)?;
 
         // 入队句柄交给上层 Layer
-        let sink = SlsSink {
+        let sink = Self {
             queue,
             policy: config.overflow_policy,
             dropped,
@@ -1374,7 +1374,7 @@ async fn run_pipeline(
             }
 
             // 到达定时冲刷时刻：即使未满也冲刷一次，并重置定时器
-            _ = tokio::time::sleep_until(flush_deadline) => {
+            () = tokio::time::sleep_until(flush_deadline) => {
                 match pipeline
                     .spawn_flush(&mut batch, &mut inflight, &shutdown_rx, None)
                     .await
@@ -1744,7 +1744,7 @@ where
                         Err(e) => Err(PutLogsOutcome::Failed(e.into())),
                     },
                     // 到达 deadline 即放弃本次请求
-                    _ = tokio::time::sleep_until(tokio::time::Instant::from_std(d)) => {
+                    () = tokio::time::sleep_until(tokio::time::Instant::from_std(d)) => {
                         Err(PutLogsOutcome::DeadlineExceeded)
                     }
                 };
@@ -1794,7 +1794,7 @@ async fn sleep_backoff(
         // 正常模式：退避期间仍监听关闭信号以尽快进入收尾
         None => {
             tokio::select! {
-                _ = tokio::time::sleep(backoff) => true,
+                () = tokio::time::sleep(backoff) => true,
                 changed = shutdown_rx.changed() => {
                     // 收到关闭信号则设定 deadline，使后续尝试受时限约束
                     if changed.is_err() || *shutdown_rx.borrow() {
@@ -1833,7 +1833,10 @@ fn backoff_delay(config: &SlsConfig, attempt: u32) -> Duration {
     let shift = (attempt - 1).min(16);
     let factor = 1u64 << shift;
     // 用 u128 + saturating 计算，避免毫秒乘法溢出
-    let millis = config.retry_base.as_millis().saturating_mul(factor as u128);
+    let millis = config
+        .retry_base
+        .as_millis()
+        .saturating_mul(u128::from(factor));
     // 不超过配置的退避上限
     let capped = millis.min(config.retry_max.as_millis());
     Duration::from_millis(capped as u64)
@@ -1989,13 +1992,13 @@ mod tests {
     fn refresh_delay_uses_expire_time_when_present() {
         // 提前刷新量 5 分钟，凭据 1 小时后到期：应在到期前 5 分钟刷新（约 55 分钟）
         let cfg = SlsConfig::new("e", "p", "l", StaticCredentialsProvider::new("ak", "sk"))
-            .credentials_refresh_ahead(Duration::from_secs(5 * 60))
+            .credentials_refresh_ahead(Duration::from_mins(5))
             .normalized();
         let creds = SlsCredentials::new("id", "secret", "token")
-            .expire_time(SystemTime::now() + Duration::from_secs(60 * 60));
+            .expire_time(SystemTime::now() + Duration::from_hours(1));
         let delay = refresh_delay_for(&cfg, &creds).expect("带有效期应返回刷新间隔");
         // 允许调度/计算耗时带来的少量偏差
-        assert!(delay <= Duration::from_secs(55 * 60));
+        assert!(delay <= Duration::from_mins(55));
         assert!(delay >= Duration::from_secs(55 * 60 - 5));
     }
 
@@ -2003,7 +2006,7 @@ mod tests {
     fn refresh_delay_clamps_to_min_when_near_expiry() {
         // 凭据即将/已经到期：进入快速刷新，避免继续使用临期 client
         let cfg = SlsConfig::new("e", "p", "l", StaticCredentialsProvider::new("ak", "sk"))
-            .credentials_refresh_ahead(Duration::from_secs(5 * 60))
+            .credentials_refresh_ahead(Duration::from_mins(5))
             .normalized();
         let creds = SlsCredentials::new("id", "secret", "token")
             .expire_time(SystemTime::now() + Duration::from_secs(10));
@@ -2114,12 +2117,12 @@ mod tests {
         let cfg = SlsConfig::new("e", "p", "l", || {
             Ok(SlsCredentials::new("id", "secret", "token"))
         })
-        .credentials_refresh_interval(Duration::from_secs(20 * 60))
+        .credentials_refresh_interval(Duration::from_mins(20))
         .normalized();
         let creds = SlsCredentials::new("id", "secret", "token");
         assert_eq!(
             refresh_delay_for(&cfg, &creds),
-            Some(Duration::from_secs(20 * 60))
+            Some(Duration::from_mins(20))
         );
     }
 

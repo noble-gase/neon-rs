@@ -1,6 +1,6 @@
 [package]
 name = "neon-helper"
-version = "0.2.1"
+version = "0.2.2"
 edition = { workspace = true }
 description = "helper toolkit"
 license = "MIT"
@@ -17,3 +17,6 @@ serde_json = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "rustls"] }
 libflate = { workspace = true }
 form_urlencoded = { workspace = true }
+
+[lints]
+workspace = true

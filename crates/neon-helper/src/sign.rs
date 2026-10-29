@@ -54,7 +54,7 @@ impl SignMap {
                 .sum(),
         );
 
-        for (k, v) in self.0.iter() {
+        for (k, v) in &self.0 {
             if ignore_keys.contains(k) {
                 continue;
             }
@@ -133,7 +133,7 @@ impl SignMap {
     /// URL 编码
     pub fn url_encode(&self) -> String {
         let mut ser = form_urlencoded::Serializer::new(String::new());
-        for (k, v) in self.0.iter() {
+        for (k, v) in &self.0 {
             ser.append_pair(k, v);
         }
         ser.finish()
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn encode_empty_modes() {
         let mut params = SignMap::new();
-        params.insert("foo".into(), "".into());
+        params.insert("foo".into(), String::new());
         params.insert("bar".into(), "baz".into());
         assert_eq!(params.encode("=", "&", None, None), "bar=baz&foo=");
         assert_eq!(

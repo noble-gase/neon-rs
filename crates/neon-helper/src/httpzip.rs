@@ -187,8 +187,8 @@ impl ArchiveEntry {
         )?;
         ensure!(header.len() >= 30, "local file header too short");
 
-        let name_len = u16::from_le_bytes([header[26], header[27]]) as u64;
-        let extra_len = u16::from_le_bytes([header[28], header[29]]) as u64;
+        let name_len = u64::from(u16::from_le_bytes([header[26], header[27]]));
+        let extra_len = u64::from(u16::from_le_bytes([header[28], header[29]]));
         // 数据区起始 = Local Header 偏移 + 30 + 文件名 + extra
         let data_offset = self.local_header_offset + 30 + name_len + extra_len;
 

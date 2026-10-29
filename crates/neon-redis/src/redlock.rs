@@ -67,7 +67,7 @@ where
 {
     /// `pool` 为 r2d2 连接池（单节点 `r2d2::Pool<redis::Client>` 或集群 `r2d2::Pool<ClusterClient>`）
     pub fn new(pool: r2d2::Pool<M>, key: impl Into<String>, ttl: time::Duration) -> Self {
-        RedLock {
+        Self {
             pool,
             key: key.into(),
             ttl,
@@ -208,7 +208,7 @@ pub struct AsyncRedLock<C: AsyncCommands + Clone + Send + 'static> {
 impl<C: AsyncCommands + Clone + Send + 'static> AsyncRedLock<C> {
     /// `conn` 为执行命令的连接（如 `client.conn()` 取得的 `ConnectionManager` / `ClusterConnection`）
     pub fn new(conn: C, key: impl Into<String>, ttl: time::Duration) -> Self {
-        AsyncRedLock {
+        Self {
             conn,
             key: key.into(),
             ttl,

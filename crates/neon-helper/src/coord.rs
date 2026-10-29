@@ -49,7 +49,7 @@ impl Location {
     }
 
     /// 球面距离（米）
-    pub fn distance(self, other: Location) -> f64 {
+    pub fn distance(self, other: Self) -> f64 {
         let lng1 = self.lng * DEG_TO_RAD;
         let lat1 = self.lat * DEG_TO_RAD;
         let lng2 = other.lng * DEG_TO_RAD;
@@ -60,7 +60,7 @@ impl Location {
     }
 
     /// 方位角（0～360 度）
-    pub fn azimuth(self, other: Location) -> f64 {
+    pub fn azimuth(self, other: Self) -> f64 {
         if other.lng == self.lng && other.lat == self.lat {
             return 0.0;
         }

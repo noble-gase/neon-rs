@@ -1,6 +1,6 @@
 [package]
 name = "neon-macro"
-version = "0.1.0"
+version = "0.1.1"
 edition = { workspace = true }
 description = "macros toolkit"
 license = "MIT"
@@ -13,3 +13,6 @@ proc-macro = true
 syn = { workspace = true, features = ["derive", "parsing", "printing"] }
 quote = { workspace = true }
 proc-macro2 = { workspace = true }
+
+[lints]
+workspace = true

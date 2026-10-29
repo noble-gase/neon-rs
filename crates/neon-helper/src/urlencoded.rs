@@ -44,7 +44,7 @@ mod tests {
             ("a".to_string(), "1+2".to_string()),
         ];
         let query = encode(&pairs);
-        println!("query: {}", query);
+        println!("query: {query}");
 
         let parsed = parse(&query);
         assert_eq!(parsed.get("a").cloned(), Some(vec!["1+2".into()]));

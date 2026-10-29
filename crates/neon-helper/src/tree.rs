@@ -15,7 +15,7 @@ pub trait Node<E> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TreeNode<T> {
     pub data: T,
-    pub children: Vec<TreeNode<T>>,
+    pub children: Vec<Self>,
 }
 
 fn build_tree<T, E>(by_parent: &mut HashMap<E, Vec<T>>, parent_id: E) -> Vec<TreeNode<T>>

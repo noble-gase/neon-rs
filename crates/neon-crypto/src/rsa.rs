@@ -48,7 +48,6 @@ pub fn generate_pkcs1_keypair(bits: usize) -> anyhow::Result<KeyPair> {
         .map_err(|e| anyhow!("encode PKCS#1 private key: {e}"))?;
     let public_pem = RsaPublicKey::from(&key)
         .to_pkcs1_pem(Pkcs1LineEnding::LF)
-        .map(|s| s.to_string())
         .map_err(|e| anyhow!("encode PKCS#1 public key: {e}"))?;
     Ok(KeyPair {
         private_pem,
@@ -68,7 +67,6 @@ pub fn generate_pkcs8_keypair(bits: usize) -> anyhow::Result<KeyPair> {
         .map_err(|e| anyhow!("encode PKCS#8 private key: {e}"))?;
     let public_pem = RsaPublicKey::from(&key)
         .to_public_key_pem(Pkcs8LineEnding::LF)
-        .map(|s| s.to_string())
         .map_err(|e| anyhow!("encode PKIX public key: {e}"))?;
     Ok(KeyPair {
         private_pem,
@@ -92,8 +90,8 @@ pub enum PrivatePemType {
 impl PrivatePemType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            PrivatePemType::RsaPrivateKey => RSA_PRIVATE_KEY,
-            PrivatePemType::PrivateKey => PRIVATE_KEY,
+            Self::RsaPrivateKey => RSA_PRIVATE_KEY,
+            Self::PrivateKey => PRIVATE_KEY,
         }
     }
 }
@@ -119,9 +117,9 @@ pub enum PublicPemType {
 impl PublicPemType {
     pub fn as_str(&self) -> &'static str {
         match self {
-            PublicPemType::RsaPublicKey => RSA_PUBLIC_KEY,
-            PublicPemType::PublicKey => PUBLIC_KEY,
-            PublicPemType::Certificate => CERTIFICATE,
+            Self::RsaPublicKey => RSA_PUBLIC_KEY,
+            Self::PublicKey => PUBLIC_KEY,
+            Self::Certificate => CERTIFICATE,
         }
     }
 }
@@ -182,10 +180,10 @@ impl PrivateKey {
         let pem = pem::parse(data.as_ref()).map_err(|e| anyhow!("no PEM data: {e}"))?;
         match pem.tag() {
             RSA_PRIVATE_KEY => RsaPrivateKey::from_pkcs1_der(pem.contents())
-                .map(|key| PrivateKey { key })
+                .map(|key| Self { key })
                 .map_err(|e| anyhow!("PKCS#1: {e}")),
             PRIVATE_KEY => RsaPrivateKey::from_pkcs8_der(pem.contents())
-                .map(|key| PrivateKey { key })
+                .map(|key| Self { key })
                 .map_err(|e| anyhow!("PKCS#8: {e}")),
             other => Err(anyhow!("unsupported PEM type: {other}")),
         }
@@ -308,10 +306,10 @@ impl PublicKey {
         let pem = pem::parse(data.as_ref()).map_err(|e| anyhow!("no PEM data: {e}"))?;
         match pem.tag() {
             RSA_PUBLIC_KEY => RsaPublicKey::from_pkcs1_der(pem.contents())
-                .map(|key| PublicKey { key })
+                .map(|key| Self { key })
                 .map_err(|e| anyhow!("PKCS#1: {e}")),
             PUBLIC_KEY => RsaPublicKey::from_public_key_der(pem.contents())
-                .map(|key| PublicKey { key })
+                .map(|key| Self { key })
                 .map_err(|e| anyhow!("PKIX: {e}")),
             CERTIFICATE => {
                 let cert =
@@ -328,12 +326,10 @@ impl PublicKey {
             PublicPemType::RsaPublicKey => self
                 .key
                 .to_pkcs1_pem(Pkcs1LineEnding::LF)
-                .map(|s| s.to_string())
                 .map_err(|e| anyhow!("encode PKCS#1 public key: {e}")),
             PublicPemType::PublicKey => self
                 .key
                 .to_public_key_pem(Pkcs8LineEnding::LF)
-                .map(|s| s.to_string())
                 .map_err(|e| anyhow!("encode PKIX public key: {e}")),
             PublicPemType::Certificate => {
                 Err(anyhow!("cannot encode public key as X.509 certificate"))

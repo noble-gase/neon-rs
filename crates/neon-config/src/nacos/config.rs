@@ -305,8 +305,7 @@ impl NacosSource {
         }
 
         match (has_access_key, has_secret_key) {
-            (true, true) => Ok(()),
-            (false, false) => Ok(()),
+            (true, true) | (false, false) => Ok(()),
             _ => Err(invalid_nacos_source(
                 "access_key 和 secret_key 必须同时配置且不能为空",
             )),
@@ -374,7 +373,7 @@ impl NacosConfig {
     /// 仅当该 data-id 发生热更新时才会通知；返回的仍是合并后的完整配置快照
     /// 若 data-id 不存在，返回 `None`
     pub fn subscribe_data_id(&self, data_id: &str) -> Option<watch::Receiver<Arc<Config>>> {
-        self.data_id_txs.get(data_id).map(|tx| tx.subscribe())
+        self.data_id_txs.get(data_id).map(watch::Sender::subscribe)
     }
 
     /// 当前配置的 data-id 列表（可用于 [`Self::subscribe_data_id`]），顺序与合并顺序一致
@@ -611,7 +610,7 @@ impl ConfigBuilder {
             entries.insert(
                 data_id.clone(),
                 ConfigEntry {
-                    content: resp.content().to_string(),
+                    content: resp.content().clone(),
                     format,
                 },
             );
@@ -861,7 +860,7 @@ where
 
 impl ConfigChangeListener for ReloadListener {
     fn notify(&self, config_resp: ConfigResponse) {
-        let data_id = config_resp.data_id().to_string();
+        let data_id = config_resp.data_id().clone();
         let format = resolve_format_for_entry(
             self.data_id_formats
                 .get(&data_id)
@@ -879,7 +878,7 @@ impl ConfigChangeListener for ReloadListener {
             return;
         };
 
-        self.enqueue_update(data_id, config_resp.content().to_string(), format);
+        self.enqueue_update(data_id, config_resp.content().clone(), format);
     }
 }
 
@@ -1058,10 +1057,10 @@ port = 7070
     #[tokio::test]
     async fn reload_updates_snapshot_without_subscribers() {
         let initial = parse_content(
-            r#"
+            r"
 [server]
 port = 8080
-"#,
+",
             Format::Toml,
         )
         .expect("initial config should parse");
@@ -1072,10 +1071,10 @@ port = 8080
         entries.insert(
             "app.toml".to_string(),
             ConfigEntry {
-                content: r#"
+                content: r"
 [server]
 port = 8080
-"#
+"
                 .to_string(),
                 format: Format::Toml,
             },
@@ -1090,10 +1089,10 @@ port = 8080
             entries,
         );
         listener.notify(config_response(
-            r#"
+            r"
 [server]
 port = 9090
-"#,
+",
             "toml",
         ));
         wait_for_reload().await;
@@ -1104,10 +1103,10 @@ port = 9090
     #[tokio::test]
     async fn reload_keeps_old_snapshot_when_new_config_is_invalid() {
         let initial = parse_content(
-            r#"
+            r"
 [server]
 port = 8080
-"#,
+",
             Format::Toml,
         )
         .expect("initial config should parse");
@@ -1118,10 +1117,10 @@ port = 8080
         entries.insert(
             "app.toml".to_string(),
             ConfigEntry {
-                content: r#"
+                content: r"
 [server]
 port = 8080
-"#
+"
                 .to_string(),
                 format: Format::Toml,
             },

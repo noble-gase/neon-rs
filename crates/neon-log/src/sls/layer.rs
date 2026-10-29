@@ -210,9 +210,8 @@ where
         }
 
         // 先按级别确定目标 sink；无对应 sink 则直接跳过，省去字段拼装开销
-        let sink_idx = match self.routing[level_index(meta.level())] {
-            Some(idx) => idx,
-            None => return,
+        let Some(sink_idx) = self.routing[level_index(meta.level())] else {
+            return;
         };
 
         // 取一次时间戳，事件的所有字段共用
